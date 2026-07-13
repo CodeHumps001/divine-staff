@@ -1,0 +1,714 @@
+// app/(app)/dashboard.tsx
+import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
+import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
+import {
+  Bell,
+  Calendar,
+  CalendarCheck,
+  ChevronRight,
+  Clock3,
+  FileText,
+  TimerReset,
+  User as UserIcon,
+} from "lucide-react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Staff } from "../../lib/api";
+import { useAuthStore } from "../../lib/store";
+
+type AttendanceRecord = {
+  id: string;
+  clockOut: string | null;
+  status: "PRESENT" | "LATE" | "ABSENT";
+  shift: { date: string };
+};
+type Shift = {
+  id: string;
+  date: string;
+  shiftType: { name: string; startTime: string; endTime: string };
+};
+type LeaveApplication = {
+  id: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+};
+type Announcement = { id: string; title: string; createdAt: string };
+
+const isSameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+// ─── Premium Insight Card ───────────────────────────────────────
+function InsightCard({
+  title,
+  value,
+  subtitle,
+  accent,
+  bars,
+  trend,
+}: {
+  title: string;
+  value: string | number | null;
+  subtitle: string;
+  accent: [string, string];
+  bars: number[];
+  trend: string;
+}) {
+  return (
+    <View
+      className="w-[220px] rounded-[20px] overflow-hidden border border-white/20"
+      style={{
+        shadowColor: "#0F172A",
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 4,
+      }}
+    >
+      <LinearGradient
+        colors={accent}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        className="px-3 py-3"
+      >
+        <View className="flex-row items-start justify-between p-3">
+          <View className="flex-1 pr-3">
+            <Text className="text-white text-[10px] font-semibold  ">
+              {title}
+            </Text>
+            <Text className="text-white text-[35px] font-bold mt-1">
+              {value !== null && value !== undefined ? value : "—"}
+            </Text>
+            <Text className="text-white/70 text-[12px] mt-1">{subtitle}</Text>
+          </View>
+          <View className="px-2 py-0.5 rounded-full bg-white/15">
+            <Text className="text-white text-[10px] font-semibold">
+              {trend}
+            </Text>
+          </View>
+        </View>
+
+        <View className="flex-row items-end h-12 mt-3 gap-1">
+          {bars.map((bar, index) => (
+            <View
+              key={index}
+              className="flex-1 rounded-t-[10px] overflow-hidden bg-white/20 justify-end"
+            >
+              <View
+                className="bg-white/90 rounded-t-[10px]"
+                style={{ height: `${bar}%` }}
+              />
+            </View>
+          ))}
+        </View>
+      </LinearGradient>
+    </View>
+  );
+}
+
+// ─── Quick Action ──────────────────────────────────────────────────
+function QuickAction({
+  icon,
+  label,
+  onPress,
+  accentColor,
+  accentBg,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+  accentColor: string;
+  accentBg: string;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      className="w-[47%] bg-white rounded-[12px] px-3.5 py-3.5 border border-gray-100 flex-row items-center gap-3"
+      style={{
+        shadowColor: "#0F172A",
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 2,
+      }}
+    >
+      <View
+        className="w-10 h-10 rounded-full items-center justify-center"
+        style={{ backgroundColor: accentBg }}
+      >
+        {icon}
+      </View>
+      <Text className="text-[13px] font-medium" style={{ color: accentColor }}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+export default function DashboardScreen() {
+  const router = useRouter();
+  const { user } = useAuthStore();
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [clockingIn, setClockingIn] = useState(false);
+
+  const [clockedIn, setClockedIn] = useState(false);
+  const [attendanceRate, setAttendanceRate] = useState<string | null>(null);
+  const [pendingLeaveCount, setPendingLeaveCount] = useState<number | null>(
+    null,
+  );
+  const [upcomingShift, setUpcomingShift] = useState<Shift | null>(null);
+  const [latestAnnouncement, setLatestAnnouncement] =
+    useState<Announcement | null>(null);
+  const [unreadDot, setUnreadDot] = useState(false);
+  const [todaysShiftCount, setTodaysShiftCount] = useState(0);
+  const [approvalRate, setApprovalRate] = useState<string | null>(null);
+  const lastAnnouncementId = useRef<string | null>(null);
+  const lastShiftId = useRef<string | null>(null);
+
+  const scheduleReminder = useCallback(async (title: string, body: string) => {
+    const settings = await Notifications.requestPermissionsAsync();
+    if (settings.status !== "granted") return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: true,
+        data: { screen: "/(app)/dashboard" },
+      },
+      trigger: null,
+    });
+  }, []);
+
+  const loadDashboard = useCallback(async () => {
+    try {
+      const [attendanceRes, leaveRes, shiftsRes, announcementsRes] =
+        await Promise.allSettled([
+          Staff.getMyAttendance(),
+          Staff.getMyLeave(),
+          Staff.getMyShifts(),
+          Staff.getAnnouncements(),
+        ]);
+
+      const records: AttendanceRecord[] =
+        attendanceRes.status === "fulfilled"
+          ? attendanceRes.value.data.data || []
+          : [];
+      const shifts: Shift[] =
+        shiftsRes.status === "fulfilled" ? shiftsRes.value.data.data || [] : [];
+
+      const today = new Date();
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      // Clock status
+      const todayRecord = records.find((r) =>
+        isSameDay(new Date(r.shift.date), today),
+      );
+      setClockedIn(!!todayRecord && !todayRecord.clockOut);
+
+      // Today's shifts
+      const todayShifts = shifts.filter((s) =>
+        isSameDay(new Date(s.date), today),
+      );
+      setTodaysShiftCount(todayShifts.length);
+
+      // Attendance rate
+      const pastShifts = shifts.filter((s) => new Date(s.date) < startOfToday);
+      if (pastShifts.length > 0) {
+        const covered = pastShifts.filter((s) =>
+          records.some(
+            (r) =>
+              isSameDay(new Date(r.shift.date), new Date(s.date)) &&
+              r.status !== "ABSENT",
+          ),
+        ).length;
+        setAttendanceRate(
+          `${Math.round((covered / pastShifts.length) * 100)}%`,
+        );
+      } else {
+        setAttendanceRate("—");
+      }
+
+      // Leave stats
+      if (leaveRes.status === "fulfilled") {
+        const leaves: LeaveApplication[] = leaveRes.value.data.data || [];
+        const total = leaves.length;
+        const approved = leaves.filter((l) => l.status === "APPROVED").length;
+        setApprovalRate(
+          total > 0 ? `${Math.round((approved / total) * 100)}%` : "—",
+        );
+        setPendingLeaveCount(
+          leaves.filter((l) => l.status === "PENDING").length,
+        );
+      }
+
+      // Upcoming shift
+      const upcoming = shifts
+        .filter((s) => new Date(s.date) >= startOfToday)
+        .sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+        );
+      const nextShift = upcoming[0] || null;
+      setUpcomingShift(nextShift);
+
+      if (nextShift && lastShiftId.current !== nextShift.id) {
+        const shiftDate = new Date(nextShift.date);
+        const isSoon = shiftDate.getTime() - Date.now() <= 24 * 60 * 60 * 1000;
+        if (isSoon) {
+          lastShiftId.current = nextShift.id;
+          void scheduleReminder(
+            "Shift reminder",
+            `${nextShift.shiftType.name} starts at ${nextShift.shiftType.startTime}`,
+          );
+        }
+      }
+
+      // Announcements
+      if (announcementsRes.status === "fulfilled") {
+        const list: Announcement[] = announcementsRes.value.data.data || [];
+        list.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+        const latest = list[0] || null;
+        setLatestAnnouncement(latest);
+        if (latest) {
+          const hrsAgo =
+            (Date.now() - new Date(latest.createdAt).getTime()) / 36e5;
+          setUnreadDot(hrsAgo < 24);
+          if (lastAnnouncementId.current !== latest.id) {
+            lastAnnouncementId.current = latest.id;
+            const notificationBody =
+              latest.title.length > 80
+                ? `${latest.title.slice(0, 77)}...`
+                : latest.title;
+            void scheduleReminder("New announcement", notificationBody);
+          }
+        }
+      }
+    } catch (err) {
+      console.log("Dashboard load error:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [scheduleReminder]);
+
+  useEffect(() => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+    loadDashboard();
+  }, [loadDashboard]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadDashboard();
+  };
+
+  const handleClockToggle = async () => {
+    setClockingIn(true);
+    try {
+      if (clockedIn) {
+        await Staff.clockOut();
+        setClockedIn(false);
+      } else {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Location required",
+            "We need your location to clock in.",
+          );
+          return;
+        }
+        const loc = await Location.getCurrentPositionAsync({});
+        await Staff.clockIn(loc.coords.latitude, loc.coords.longitude);
+        setClockedIn(true);
+      }
+      loadDashboard();
+    } catch (err: any) {
+      Alert.alert(
+        "Error",
+        err.response?.data?.message || "Something went wrong",
+      );
+    } finally {
+      setClockingIn(false);
+    }
+  };
+
+  const greeting = (() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning 👋";
+    if (hour < 17) return "Good Afternoon 👋";
+    return "Good Evening 👋";
+  })();
+
+  if (loading) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
+        <ActivityIndicator size="large" color="#006B3C" />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView className="flex-1 bg-gray-50" edges={["top", "bottom"]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* ─── PREMIUM HEADER ─────────────────────────────────── */}
+        <View className="mx-4 mt-4 overflow-hidden rounded-[28px] ">
+          <LinearGradient
+            colors={["#0F5132", "#146C43", "#1F8B5B"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            className="px-5 py-5"
+          >
+            <View className="absolute -right-2 -top-8 w-24 h-24 rounded-full bg-white/10" />
+            <View className="absolute -left-3 bottom-0 w-20 h-20 rounded-full bg-white/10" />
+
+            <View className="flex-row items-start justify-between relative z-10 p-5">
+              <View className="flex-1 pr-4">
+                <Text className="text-white text-sm font-semibold mt-3">
+                  {greeting},
+                </Text>
+                <Text className="text-white text-[42px] font-semibold mt-0.5">
+                  {user?.firstName || user?.name || "Staff"}
+                </Text>
+                <Text className="text-emerald-50 text-sm mt-2">
+                  Everything you need for today in one polished place.
+                </Text>
+              </View>
+
+              <View className="flex-row items-center gap-2">
+                <TouchableOpacity
+                  onPress={() => router.push("/(app)/announcements")}
+                  className="w-10 h-10 rounded-full bg-white/15 items-center justify-center"
+                  activeOpacity={0.7}
+                >
+                  <Bell size={18} color="#fff" />
+                  {unreadDot && (
+                    <View className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400" />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.push("/(app)/profile")}
+                  className="w-10 h-10 rounded-full bg-white/15 items-center justify-center"
+                  activeOpacity={0.7}
+                >
+                  <UserIcon size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* ─── CLOCK IN CARD ────────────────────────────────────── */}
+        <View className="mx-4 mt-4">
+          <View
+            className="bg-white rounded-[24px] px-5 py-4 border border-gray-100"
+            style={{
+              shadowColor: "#0F172A",
+              shadowOpacity: 0.06,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 8 },
+              elevation: 3,
+            }}
+          >
+            <View className="flex-row items-center justify-between">
+              <View className="flex-1 pr-3">
+                <Text className="text-gray-400 text-[10px] font-semibold uppercase tracking-[0.2em]">
+                  Today's Status
+                </Text>
+                <View className="flex-row items-center mt-1">
+                  <View
+                    className={`w-2 h-2 rounded-full mr-2 ${
+                      clockedIn ? "bg-emerald-500" : "bg-gray-300"
+                    }`}
+                  />
+                  <Text className="text-gray-700 text-sm font-medium">
+                    {clockedIn ? "Clocked In" : "Not Clocked In"}
+                  </Text>
+                </View>
+                <Text className="text-gray-400 text-xs mt-1">
+                  {clockedIn
+                    ? "You are currently on duty."
+                    : "Tap to clock in when ready."}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleClockToggle}
+                disabled={clockingIn}
+                activeOpacity={0.8}
+                className={`px-3 py-3 rounded-2xl flex-row items-center ${
+                  clockedIn ? "bg-red-50" : "bg-emerald-600"
+                } ${clockingIn ? "opacity-60" : ""}`}
+              >
+                {clockingIn ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={clockedIn ? "#DC2626" : "#fff"}
+                  />
+                ) : (
+                  <>
+                    <View
+                      className={`w-9 h-9 rounded-full items-center justify-center mr-2 ${
+                        clockedIn ? "bg-white/70" : "bg-white/15"
+                      }`}
+                    >
+                      {clockedIn ? (
+                        <TimerReset size={16} color="#DC2626" />
+                      ) : (
+                        <Clock3 size={16} color="#fff" />
+                      )}
+                    </View>
+                    <Text
+                      className={`font-semibold text-sm ${
+                        clockedIn ? "text-red-600" : "text-white"
+                      }`}
+                    >
+                      {clockedIn ? "Clock Out" : "Clock In"}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* ─── INSIGHTS CAROUSEL ───────────────────────────────── */}
+        <View className="mx-4 mt-4">
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-gray-700 text-[13px] font-semibold">
+              Performance Snapshot
+            </Text>
+            <Text className="text-emerald-600 text-[10px] font-semibold">
+              Swipe for more
+            </Text>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingVertical: 2,
+              paddingRight: 10,
+              paddingLeft: 0,
+            }}
+          >
+            <View className="flex-row gap-3">
+              <InsightCard
+                title="Attendance Pulse"
+                value={attendanceRate ?? "—"}
+                subtitle="Coverage across your recent shifts"
+                accent={["#0F766E", "#34D399"]}
+                bars={[45, 68, 74, 82, 90]}
+                trend="+8%"
+              />
+              <InsightCard
+                title="Leave Approval"
+                value={approvalRate ?? "—"}
+                subtitle="How your requests are performing"
+                accent={["#7C3AED", "#A78BFA"]}
+                bars={[30, 45, 62, 78, 90]}
+                trend="Stable"
+              />
+              <InsightCard
+                title="Shift Load"
+                value={todaysShiftCount}
+                subtitle="Shifts on your schedule today"
+                accent={["#D97706", "#FBBF24"]}
+                bars={[50, 65, 58, 74, 82]}
+                trend="On track"
+              />
+            </View>
+          </ScrollView>
+        </View>
+
+        {/* ─── QUICK ACTIONS ────────────────────────────────────── */}
+        <View className="mx-4 mt-5">
+          <Text className="text-gray-700 text-[13px] font-semibold mb-2.5">
+            Quick Actions
+          </Text>
+          <View className="flex-row flex-wrap justify-between gap-3">
+            <QuickAction
+              icon={<CalendarCheck size={18} color="#2563EB" />}
+              label="Attendance"
+              onPress={() => router.push("/(app)/attendance")}
+              accentColor="#2563EB"
+              accentBg="#DBEAFE"
+            />
+            <QuickAction
+              icon={<FileText size={18} color="#7C3AED" />}
+              label="Request Leave"
+              onPress={() => router.push("/(app)/leave")}
+              accentColor="#7C3AED"
+              accentBg="#EDE9FE"
+            />
+            <QuickAction
+              icon={<Calendar size={18} color="#D97706" />}
+              label="My Shifts"
+              onPress={() => router.push("/(app)/shifts")}
+              accentColor="#D97706"
+              accentBg="#FEF3C7"
+            />
+            <QuickAction
+              icon={<Bell size={18} color="#059669" />}
+              label="Announcements"
+              onPress={() => router.push("/(app)/announcements")}
+              accentColor="#059669"
+              accentBg="#D1FAE5"
+            />
+          </View>
+        </View>
+
+        {/* ─── UPCOMING SHIFT ────────────────────────────────────── */}
+        <View className="mx-4 mt-5">
+          <View className="flex-row items-center justify-between mb-2.5">
+            <Text className="text-gray-700 text-[13px] font-semibold">
+              Upcoming Shift
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/(app)/shifts")}
+              activeOpacity={0.7}
+            >
+              <Text className="text-emerald-600 text-xs font-semibold">
+                View All
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View
+            className="bg-white rounded-[24px] px-5 py-4 border border-gray-100"
+            style={{
+              shadowColor: "#0F172A",
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: 2,
+            }}
+          >
+            {upcomingShift ? (
+              <View>
+                <View className="flex-row items-center justify-between">
+                  <View>
+                    <Text className="text-gray-700 text-sm font-semibold">
+                      {new Date(upcomingShift.date).toLocaleDateString(
+                        "en-US",
+                        {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        },
+                      )}
+                    </Text>
+                    <Text className="text-gray-500 text-sm font-normal mt-0.5">
+                      {upcomingShift.shiftType.name}
+                    </Text>
+                  </View>
+                  <View className="bg-emerald-50 px-3 py-1.5 rounded-full">
+                    <Text className="text-emerald-700 text-xs font-semibold">
+                      {upcomingShift.shiftType.startTime}–
+                      {upcomingShift.shiftType.endTime}
+                    </Text>
+                  </View>
+                </View>
+                <View className="flex-row items-center mt-3 pt-3 border-t border-gray-50">
+                  <Clock3 size={14} color="#94A3B8" />
+                  <Text className="text-gray-400 text-xs ml-1.5">
+                    {(() => {
+                      const shiftDate = new Date(upcomingShift.date);
+                      const now = new Date();
+                      const diff = shiftDate.getTime() - now.getTime();
+                      const hours = Math.floor(diff / (1000 * 60 * 60));
+                      if (hours < 0) return "Shift started";
+                      if (hours < 1) return "Starting soon";
+                      if (hours < 24) return `In ${hours}h`;
+                      return `${Math.floor(hours / 24)}d away`;
+                    })()}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View className="py-2">
+                <Text className="text-gray-400 text-sm font-normal">
+                  No upcoming shifts
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* ─── LATEST ANNOUNCEMENT ──────────────────────────────── */}
+        {latestAnnouncement && (
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/announcements")}
+            activeOpacity={0.7}
+            className="mx-4 mt-4 bg-white rounded-[24px] px-5 py-4 border border-gray-100 flex-row items-center"
+            style={{
+              shadowColor: "#0F172A",
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: 2,
+            }}
+          >
+            <View className="w-9 h-9 rounded-full bg-gray-50 items-center justify-center mr-3">
+              <Bell size={16} color="#64748B" />
+            </View>
+            <View className="flex-1">
+              <View className="flex-row items-center gap-2">
+                <Text
+                  className="text-gray-700 text-sm font-medium"
+                  numberOfLines={1}
+                >
+                  {latestAnnouncement.title}
+                </Text>
+                {unreadDot && (
+                  <View className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                )}
+              </View>
+              <Text className="text-gray-400 text-xs mt-0.5">
+                {new Date(latestAnnouncement.createdAt).toLocaleDateString(
+                  "en-US",
+                  {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  },
+                )}
+              </Text>
+            </View>
+            <ChevronRight size={16} color="#94A3B8" />
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
