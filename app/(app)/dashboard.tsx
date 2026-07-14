@@ -10,8 +10,11 @@ import {
   ChevronRight,
   Clock3,
   FileText,
+  Lock,
+  Settings2,
   TimerReset,
   User as UserIcon,
+  Users,
 } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -23,7 +26,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Staff } from "../../lib/api";
 import { useAuthStore } from "../../lib/store";
 
@@ -117,23 +123,33 @@ function InsightCard({
   );
 }
 
-// ─── Quick Action ──────────────────────────────────────────────────
+// ─── Quick Action (now supports a locked/disabled state) ───────
 function QuickAction({
   icon,
   label,
   onPress,
   accentColor,
   accentBg,
+  locked,
 }: {
   icon: React.ReactNode;
   label: string;
   onPress: () => void;
   accentColor: string;
   accentBg: string;
+  locked?: boolean;
 }) {
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={
+        locked
+          ? () =>
+              Alert.alert(
+                "Not available",
+                "This feature is only available to Department Heads.",
+              )
+          : onPress
+      }
       activeOpacity={0.7}
       className="w-[47%] bg-white rounded-[12px] px-3.5 py-3.5 border border-gray-100 flex-row items-center gap-3"
       style={{
@@ -142,15 +158,19 @@ function QuickAction({
         shadowRadius: 8,
         shadowOffset: { width: 0, height: 4 },
         elevation: 2,
+        opacity: locked ? 0.55 : 1,
       }}
     >
       <View
         className="w-10 h-10 rounded-full items-center justify-center"
-        style={{ backgroundColor: accentBg }}
+        style={{ backgroundColor: locked ? "#F1F5F9" : accentBg }}
       >
-        {icon}
+        {locked ? <Lock size={16} color="#94A3B8" /> : icon}
       </View>
-      <Text className="text-[13px] font-medium" style={{ color: accentColor }}>
+      <Text
+        className="text-[13px] font-medium"
+        style={{ color: locked ? "#94A3B8" : accentColor }}
+      >
         {label}
       </Text>
     </TouchableOpacity>
@@ -160,6 +180,10 @@ function QuickAction({
 export default function DashboardScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
+
+  const isDeptHead = user?.role === "DEPT_HEAD";
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -196,6 +220,25 @@ export default function DashboardScreen() {
 
   const loadDashboard = useCallback(async () => {
     try {
+      // SUPER_ADMIN has no personal shifts/leave/attendance —
+      // skip those calls entirely for that role
+      if (isSuperAdmin) {
+        const announcementsRes = await Staff.getAnnouncements().catch(
+          () => null,
+        );
+        if (announcementsRes) {
+          const list: Announcement[] = announcementsRes.data.data || [];
+          list.sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          );
+          setLatestAnnouncement(list[0] || null);
+        }
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       const [attendanceRes, leaveRes, shiftsRes, announcementsRes] =
         await Promise.allSettled([
           Staff.getMyAttendance(),
@@ -307,7 +350,7 @@ export default function DashboardScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [scheduleReminder]);
+  }, [scheduleReminder, isSuperAdmin]);
 
   useEffect(() => {
     Notifications.setNotificationHandler({
@@ -373,7 +416,7 @@ export default function DashboardScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top", "bottom"]}>
+    <SafeAreaView className="flex-1 bg-[#F5F7F6]" edges={["bottom"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 24 }}
@@ -382,7 +425,7 @@ export default function DashboardScreen() {
         }
       >
         {/* ─── PREMIUM HEADER ─────────────────────────────────── */}
-        <View className="mx-4 mt-4 overflow-hidden rounded-[28px] ">
+        <View className="mx-4 mt-14 overflow-hidden rounded-[28px] ">
           <LinearGradient
             colors={["#0F5132", "#146C43", "#1F8B5B"]}
             start={{ x: 0, y: 0 }}
@@ -428,243 +471,269 @@ export default function DashboardScreen() {
           </LinearGradient>
         </View>
 
-        {/* ─── CLOCK IN CARD ────────────────────────────────────── */}
-        <View className="mx-4 mt-4">
-          <View
-            className="bg-white rounded-[24px] px-5 py-4 border border-gray-100"
-            style={{
-              shadowColor: "#0F172A",
-              shadowOpacity: 0.06,
-              shadowRadius: 14,
-              shadowOffset: { width: 0, height: 8 },
-              elevation: 3,
-            }}
-          >
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1 pr-3">
-                <Text className="text-gray-400 text-[10px] font-semibold uppercase tracking-[0.2em]">
-                  Today's Status
-                </Text>
-                <View className="flex-row items-center mt-1">
-                  <View
-                    className={`w-2 h-2 rounded-full mr-2 ${
-                      clockedIn ? "bg-emerald-500" : "bg-gray-300"
-                    }`}
-                  />
-                  <Text className="text-gray-700 text-sm font-medium">
-                    {clockedIn ? "Clocked In" : "Not Clocked In"}
+        {/* ─── CLOCK IN CARD — hidden for SUPER_ADMIN (no personal shifts) ── */}
+        {!isSuperAdmin && (
+          <View className="mx-4 mt-4">
+            <View
+              className="bg-white rounded-[24px] px-5 py-4 border border-gray-100"
+              style={{
+                shadowColor: "#0F172A",
+                shadowOpacity: 0.06,
+                shadowRadius: 14,
+                shadowOffset: { width: 0, height: 8 },
+                elevation: 3,
+              }}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 pr-3">
+                  <Text className="text-gray-400 text-[10px] font-semibold uppercase tracking-[0.2em]">
+                    Today's Status
+                  </Text>
+                  <View className="flex-row items-center mt-1">
+                    <View
+                      className={`w-2 h-2 rounded-full mr-2 ${
+                        clockedIn ? "bg-emerald-500" : "bg-gray-300"
+                      }`}
+                    />
+                    <Text className="text-gray-700 text-sm font-medium">
+                      {clockedIn ? "Clocked In" : "Not Clocked In"}
+                    </Text>
+                  </View>
+                  <Text className="text-gray-400 text-xs mt-1">
+                    {clockedIn
+                      ? "You are currently on duty."
+                      : "Tap to clock in when ready."}
                   </Text>
                 </View>
-                <Text className="text-gray-400 text-xs mt-1">
-                  {clockedIn
-                    ? "You are currently on duty."
-                    : "Tap to clock in when ready."}
-                </Text>
+                <TouchableOpacity
+                  onPress={handleClockToggle}
+                  disabled={clockingIn}
+                  activeOpacity={0.8}
+                  className={`px-3 py-3 rounded-2xl flex-row items-center ${
+                    clockedIn ? "bg-red-50" : "bg-emerald-600"
+                  } ${clockingIn ? "opacity-60" : ""}`}
+                >
+                  {clockingIn ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={clockedIn ? "#DC2626" : "#fff"}
+                    />
+                  ) : (
+                    <>
+                      <View
+                        className={`w-9 h-9 rounded-full items-center justify-center mr-2 ${
+                          clockedIn ? "bg-white/70" : "bg-white/15"
+                        }`}
+                      >
+                        {clockedIn ? (
+                          <TimerReset size={16} color="#DC2626" />
+                        ) : (
+                          <Clock3 size={16} color="#fff" />
+                        )}
+                      </View>
+                      <Text
+                        className={`font-semibold text-sm ${
+                          clockedIn ? "text-red-600" : "text-white"
+                        }`}
+                      >
+                        {clockedIn ? "Clock Out" : "Clock In"}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        )}
+
+        {/* ─── INSIGHTS CAROUSEL — hidden for SUPER_ADMIN ────────── */}
+        {!isSuperAdmin && (
+          <View className="mx-4 mt-4">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-gray-700 text-[13px] font-semibold">
+                Performance Snapshot
+              </Text>
+              <Text className="text-emerald-600 text-[10px] font-semibold">
+                Swipe for more
+              </Text>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingVertical: 2,
+                paddingRight: 10,
+                paddingLeft: 0,
+              }}
+            >
+              <View className="flex-row gap-3">
+                <InsightCard
+                  title="Attendance Pulse"
+                  value={attendanceRate ?? "—"}
+                  subtitle="Coverage across your recent shifts"
+                  accent={["#0F766E", "#34D399"]}
+                  bars={[45, 68, 74, 82, 90]}
+                  trend="+8%"
+                />
+                <InsightCard
+                  title="Leave Approval"
+                  value={approvalRate ?? "—"}
+                  subtitle="How your requests are performing"
+                  accent={["#7C3AED", "#A78BFA"]}
+                  bars={[30, 45, 62, 78, 90]}
+                  trend="Stable"
+                />
+                <InsightCard
+                  title="Shift Load"
+                  value={todaysShiftCount}
+                  subtitle="Shifts on your schedule today"
+                  accent={["#D97706", "#FBBF24"]}
+                  bars={[50, 65, 58, 74, 82]}
+                  trend="On track"
+                />
+              </View>
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ─── QUICK ACTIONS — hidden entirely for SUPER_ADMIN ───── */}
+        {!isSuperAdmin && (
+          <View className="mx-4 mt-5">
+            <Text className="text-gray-700 text-[13px] font-semibold mb-2.5">
+              Quick Actions
+            </Text>
+            <View className="flex-row flex-wrap justify-between gap-3">
+              <QuickAction
+                icon={<CalendarCheck size={18} color="#2563EB" />}
+                label="Attendance"
+                onPress={() => router.push("/(app)/attendance")}
+                accentColor="#2563EB"
+                accentBg="#DBEAFE"
+              />
+              <QuickAction
+                icon={<FileText size={18} color="#7C3AED" />}
+                label="Request Leave"
+                onPress={() => router.push("/(app)/leave")}
+                accentColor="#7C3AED"
+                accentBg="#EDE9FE"
+              />
+              <QuickAction
+                icon={<Calendar size={18} color="#D97706" />}
+                label="My Shifts"
+                onPress={() => router.push("/(app)/shifts")}
+                accentColor="#D97706"
+                accentBg="#FEF3C7"
+              />
+              <QuickAction
+                icon={<Bell size={18} color="#059669" />}
+                label="Announcements"
+                onPress={() => router.push("/(app)/announcements")}
+                accentColor="#059669"
+                accentBg="#D1FAE5"
+              />
+
+              {/* ── DEPT_HEAD-only actions — visible to STAFF too, but locked ── */}
+              <QuickAction
+                icon={<Settings2 size={18} color="#DB2777" />}
+                label="Generate Schedule"
+                onPress={() => router.push("/(app)/shifts/generate")}
+                accentColor="#DB2777"
+                accentBg="#FCE7F3"
+                locked={!isDeptHead}
+              />
+              <QuickAction
+                icon={<Users size={18} color="#0891B2" />}
+                label="Review Leave"
+                onPress={() => router.push("/(app)/leave/department")}
+                accentColor="#0891B2"
+                accentBg="#CFFAFE"
+                locked={!isDeptHead}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* ─── UPCOMING SHIFT — hidden for SUPER_ADMIN ───────────── */}
+        {!isSuperAdmin && (
+          <View className="mx-4 mt-5">
+            <View className="flex-row items-center justify-between mb-2.5">
+              <Text className="text-gray-700 text-[13px] font-semibold">
+                Upcoming Shift
+              </Text>
               <TouchableOpacity
-                onPress={handleClockToggle}
-                disabled={clockingIn}
-                activeOpacity={0.8}
-                className={`px-3 py-3 rounded-2xl flex-row items-center ${
-                  clockedIn ? "bg-red-50" : "bg-emerald-600"
-                } ${clockingIn ? "opacity-60" : ""}`}
+                onPress={() => router.push("/(app)/shifts")}
+                activeOpacity={0.7}
               >
-                {clockingIn ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={clockedIn ? "#DC2626" : "#fff"}
-                  />
-                ) : (
-                  <>
-                    <View
-                      className={`w-9 h-9 rounded-full items-center justify-center mr-2 ${
-                        clockedIn ? "bg-white/70" : "bg-white/15"
-                      }`}
-                    >
-                      {clockedIn ? (
-                        <TimerReset size={16} color="#DC2626" />
-                      ) : (
-                        <Clock3 size={16} color="#fff" />
-                      )}
-                    </View>
-                    <Text
-                      className={`font-semibold text-sm ${
-                        clockedIn ? "text-red-600" : "text-white"
-                      }`}
-                    >
-                      {clockedIn ? "Clock Out" : "Clock In"}
-                    </Text>
-                  </>
-                )}
+                <Text className="text-emerald-600 text-xs font-semibold">
+                  View All
+                </Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
 
-        {/* ─── INSIGHTS CAROUSEL ───────────────────────────────── */}
-        <View className="mx-4 mt-4">
-          <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-gray-700 text-[13px] font-semibold">
-              Performance Snapshot
-            </Text>
-            <Text className="text-emerald-600 text-[10px] font-semibold">
-              Swipe for more
-            </Text>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingVertical: 2,
-              paddingRight: 10,
-              paddingLeft: 0,
-            }}
-          >
-            <View className="flex-row gap-3">
-              <InsightCard
-                title="Attendance Pulse"
-                value={attendanceRate ?? "—"}
-                subtitle="Coverage across your recent shifts"
-                accent={["#0F766E", "#34D399"]}
-                bars={[45, 68, 74, 82, 90]}
-                trend="+8%"
-              />
-              <InsightCard
-                title="Leave Approval"
-                value={approvalRate ?? "—"}
-                subtitle="How your requests are performing"
-                accent={["#7C3AED", "#A78BFA"]}
-                bars={[30, 45, 62, 78, 90]}
-                trend="Stable"
-              />
-              <InsightCard
-                title="Shift Load"
-                value={todaysShiftCount}
-                subtitle="Shifts on your schedule today"
-                accent={["#D97706", "#FBBF24"]}
-                bars={[50, 65, 58, 74, 82]}
-                trend="On track"
-              />
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* ─── QUICK ACTIONS ────────────────────────────────────── */}
-        <View className="mx-4 mt-5">
-          <Text className="text-gray-700 text-[13px] font-semibold mb-2.5">
-            Quick Actions
-          </Text>
-          <View className="flex-row flex-wrap justify-between gap-3">
-            <QuickAction
-              icon={<CalendarCheck size={18} color="#2563EB" />}
-              label="Attendance"
-              onPress={() => router.push("/(app)/attendance")}
-              accentColor="#2563EB"
-              accentBg="#DBEAFE"
-            />
-            <QuickAction
-              icon={<FileText size={18} color="#7C3AED" />}
-              label="Request Leave"
-              onPress={() => router.push("/(app)/leave")}
-              accentColor="#7C3AED"
-              accentBg="#EDE9FE"
-            />
-            <QuickAction
-              icon={<Calendar size={18} color="#D97706" />}
-              label="My Shifts"
-              onPress={() => router.push("/(app)/shifts")}
-              accentColor="#D97706"
-              accentBg="#FEF3C7"
-            />
-            <QuickAction
-              icon={<Bell size={18} color="#059669" />}
-              label="Announcements"
-              onPress={() => router.push("/(app)/announcements")}
-              accentColor="#059669"
-              accentBg="#D1FAE5"
-            />
-          </View>
-        </View>
-
-        {/* ─── UPCOMING SHIFT ────────────────────────────────────── */}
-        <View className="mx-4 mt-5">
-          <View className="flex-row items-center justify-between mb-2.5">
-            <Text className="text-gray-700 text-[13px] font-semibold">
-              Upcoming Shift
-            </Text>
-            <TouchableOpacity
-              onPress={() => router.push("/(app)/shifts")}
-              activeOpacity={0.7}
+            <View
+              className="bg-white rounded-[24px] px-5 py-4 border border-gray-100"
+              style={{
+                shadowColor: "#0F172A",
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 2,
+              }}
             >
-              <Text className="text-emerald-600 text-xs font-semibold">
-                View All
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View
-            className="bg-white rounded-[24px] px-5 py-4 border border-gray-100"
-            style={{
-              shadowColor: "#0F172A",
-              shadowOpacity: 0.05,
-              shadowRadius: 10,
-              shadowOffset: { width: 0, height: 4 },
-              elevation: 2,
-            }}
-          >
-            {upcomingShift ? (
-              <View>
-                <View className="flex-row items-center justify-between">
-                  <View>
-                    <Text className="text-gray-700 text-sm font-semibold">
-                      {new Date(upcomingShift.date).toLocaleDateString(
-                        "en-US",
-                        {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                        },
-                      )}
-                    </Text>
-                    <Text className="text-gray-500 text-sm font-normal mt-0.5">
-                      {upcomingShift.shiftType.name}
-                    </Text>
+              {upcomingShift ? (
+                <View>
+                  <View className="flex-row items-center justify-between">
+                    <View>
+                      <Text className="text-gray-700 text-sm font-semibold">
+                        {new Date(upcomingShift.date).toLocaleDateString(
+                          "en-US",
+                          {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          },
+                        )}
+                      </Text>
+                      <Text className="text-gray-500 text-sm font-normal mt-0.5">
+                        {upcomingShift.shiftType.name}
+                      </Text>
+                    </View>
+                    <View className="bg-emerald-50 px-3 py-1.5 rounded-full">
+                      <Text className="text-emerald-700 text-xs font-semibold">
+                        {upcomingShift.shiftType.startTime}–
+                        {upcomingShift.shiftType.endTime}
+                      </Text>
+                    </View>
                   </View>
-                  <View className="bg-emerald-50 px-3 py-1.5 rounded-full">
-                    <Text className="text-emerald-700 text-xs font-semibold">
-                      {upcomingShift.shiftType.startTime}–
-                      {upcomingShift.shiftType.endTime}
+                  <View className="flex-row items-center mt-3 pt-3 border-t border-gray-50">
+                    <Clock3 size={14} color="#94A3B8" />
+                    <Text className="text-gray-400 text-xs ml-1.5">
+                      {(() => {
+                        const shiftDate = new Date(upcomingShift.date);
+                        const now = new Date();
+                        const diff = shiftDate.getTime() - now.getTime();
+                        const hours = Math.floor(diff / (1000 * 60 * 60));
+                        if (hours < 0) return "Shift started";
+                        if (hours < 1) return "Starting soon";
+                        if (hours < 24) return `In ${hours}h`;
+                        return `${Math.floor(hours / 24)}d away`;
+                      })()}
                     </Text>
                   </View>
                 </View>
-                <View className="flex-row items-center mt-3 pt-3 border-t border-gray-50">
-                  <Clock3 size={14} color="#94A3B8" />
-                  <Text className="text-gray-400 text-xs ml-1.5">
-                    {(() => {
-                      const shiftDate = new Date(upcomingShift.date);
-                      const now = new Date();
-                      const diff = shiftDate.getTime() - now.getTime();
-                      const hours = Math.floor(diff / (1000 * 60 * 60));
-                      if (hours < 0) return "Shift started";
-                      if (hours < 1) return "Starting soon";
-                      if (hours < 24) return `In ${hours}h`;
-                      return `${Math.floor(hours / 24)}d away`;
-                    })()}
+              ) : (
+                <View className="py-2">
+                  <Text className="text-gray-400 text-sm font-normal">
+                    No upcoming shifts
                   </Text>
                 </View>
-              </View>
-            ) : (
-              <View className="py-2">
-                <Text className="text-gray-400 text-sm font-normal">
-                  No upcoming shifts
-                </Text>
-              </View>
-            )}
+              )}
+            </View>
           </View>
-        </View>
+        )}
 
-        {/* ─── LATEST ANNOUNCEMENT ──────────────────────────────── */}
+        {/* ─── LATEST ANNOUNCEMENT — visible to everyone, incl. SUPER_ADMIN ── */}
         {latestAnnouncement && (
           <TouchableOpacity
             onPress={() => router.push("/(app)/announcements")}

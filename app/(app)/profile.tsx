@@ -1,4 +1,5 @@
 // app/(app)/profile.tsx
+import Constants from "expo-constants";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -6,26 +7,99 @@ import {
   ArrowLeft,
   Briefcase,
   Building2,
+  Check,
+  Lock,
   LogOut,
   Mail,
+  MessageSquarePlus,
   Phone,
   X,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Staff } from "../../lib/api";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { Auth, Staff } from "../../lib/api";
 import { useAuthStore } from "../../lib/store";
+
+const FEEDBACK_CATEGORIES = [
+  { key: "GENERAL", label: "General" },
+  { key: "BUG", label: "Bug Report" },
+  { key: "FEATURE_REQUEST", label: "Feature Request" },
+];
+
+// ── Reusable bottom-sheet modal that stays clear of the keyboard ──
+function BottomSheetModal({
+  visible,
+  onClose,
+  title,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View className="flex-1 bg-black/40 justify-end">
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View
+                className="bg-white rounded-t-[28px] px-5 pt-5"
+                style={{
+                  maxHeight: "85%",
+                  paddingBottom: Platform.OS === "ios" ? 34 : 20,
+                }}
+              >
+                <View className="flex-row items-center justify-between mb-5">
+                  <Text className="text-gray-900 text-lg font-bold">
+                    {title}
+                  </Text>
+                  <TouchableOpacity onPress={onClose}>
+                    <X size={22} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: 8 }}
+                >
+                  {children}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -37,6 +111,28 @@ export default function ProfileScreen() {
   const [bio, setBio] = useState(user?.profile?.bio || "");
   const [photoUrl, setPhotoUrl] = useState(user?.profile?.photoUrl || "");
   const [localImageUri, setLocalImageUri] = useState<string | null>(null);
+
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState("GENERAL");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [sendingFeedback, setSendingFeedback] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
+
+  const [pwModalOpen, setPwModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPw, setChangingPw] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  // ── Re-sync local form state whenever the logged-in user changes ──
+  // (fixes stale/blank fields after logout → login without a full unmount)
+  useEffect(() => {
+    setPhone(user?.profile?.phone || "");
+    setBio(user?.profile?.bio || "");
+    setPhotoUrl(user?.profile?.photoUrl || "");
+    setLocalImageUri(null);
+  }, [user?.id]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -51,7 +147,7 @@ export default function ProfileScreen() {
       quality: 0.7,
     });
     if (!result.canceled) {
-      setLocalImageUri(result.assets[0].uri); // preview immediately
+      setLocalImageUri(result.assets[0].uri);
     }
   };
 
@@ -67,11 +163,10 @@ export default function ProfileScreen() {
           name: "profile.jpg",
         } as any);
         const uploadRes = await Staff.uploadImage(formData);
-        finalPhotoUrl = uploadRes.data.data.url; // adjust to your actual response shape
+        finalPhotoUrl = uploadRes.data.data.url;
       }
       await Staff.updateProfile({ phone, bio, photoUrl: finalPhotoUrl });
       setPhotoUrl(finalPhotoUrl);
-      // update the store locally so the change reflects immediately
       useAuthStore.setState((s) => ({
         user: {
           ...s.user,
@@ -89,6 +184,69 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleSendFeedback = async () => {
+    if (!feedbackMessage.trim()) {
+      Alert.alert(
+        "Empty message",
+        "Please write your feedback before sending.",
+      );
+      return;
+    }
+    setSendingFeedback(true);
+    try {
+      await Staff.submitFeedback(feedbackMessage.trim(), feedbackCategory);
+      setFeedbackMessage("");
+      setFeedbackCategory("GENERAL");
+      setFeedbackSent(true);
+      setTimeout(() => {
+        setFeedbackSent(false);
+        setFeedbackOpen(false);
+      }, 1200);
+    } catch (err: any) {
+      Alert.alert(
+        "Couldn't send",
+        err.response?.data?.message ||
+          "Something went wrong. Please try again.",
+      );
+    } finally {
+      setSendingFeedback(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert("Missing info", "Please fill in all password fields.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert(
+        "Passwords don't match",
+        "New password and confirmation must match.",
+      );
+      return;
+    }
+    if (newPassword.length < 8) {
+      Alert.alert("Too short", "New password must be at least 8 characters.");
+      return;
+    }
+    setChangingPw(true);
+    try {
+      await Auth.changePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPwModalOpen(false);
+      Alert.alert("Success", "Your password has been changed.");
+    } catch (err: any) {
+      Alert.alert(
+        "Couldn't change password",
+        err.response?.data?.message || "Something went wrong",
+      );
+    } finally {
+      setChangingPw(false);
+    }
+  };
+
   const handleLogout = () => {
     Alert.alert("Log out", "Are you sure you want to log out?", [
       { text: "Cancel", style: "cancel" },
@@ -103,6 +261,15 @@ export default function ProfileScreen() {
     ]);
   };
 
+  // ── Guard against rendering with a null user during logout → redirect ──
+  if (!user) {
+    return (
+      <SafeAreaView className="flex-1 bg-[#F5F7F6] items-center justify-center">
+        <ActivityIndicator size="large" color="#0F766E" />
+      </SafeAreaView>
+    );
+  }
+
   const initials = `${user?.firstName?.[0] || ""}${
     user?.lastName?.[0] || ""
   }`.toUpperCase();
@@ -110,13 +277,20 @@ export default function ProfileScreen() {
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
     "Staff Member";
 
+  const appVersion = Constants.expoConfig?.version || "1.0.0";
+  const buildNumber =
+    Constants.expoConfig?.ios?.buildNumber ||
+    Constants.expoConfig?.android?.versionCode ||
+    null;
+
   return (
-    <SafeAreaView className="flex-1 bg-[#F5F7F6]" edges={["top", "bottom"]}>
+    <SafeAreaView className="flex-1 bg-[#F5F7F6]" edges={["bottom"]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        className="mx-4 mt-3 rounded-[28px] px-4 py-4"
+        style={{ paddingTop: insets.top + 12 }}
+        className="mx-4 rounded-[28px] px-4 py-4"
       >
         <View className="flex-row items-center p-5">
           <TouchableOpacity
@@ -249,98 +423,252 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {/* ── Security ── */}
+        <TouchableOpacity
+          onPress={() => setPwModalOpen(true)}
+          className="mt-5 flex-row items-center rounded-[22px] border border-gray-100 bg-white p-4"
+        >
+          <View className="w-9 h-9 rounded-xl bg-gray-50 items-center justify-center mr-3">
+            <Lock size={16} color="#6B7280" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-gray-900 font-medium">Change Password</Text>
+            <Text className="text-gray-400 text-xs mt-0.5">
+              Update your account password
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* ── Feedback ── */}
+        <TouchableOpacity
+          onPress={() => setFeedbackOpen(true)}
+          className="mt-3 flex-row items-center rounded-[22px] border border-gray-100 bg-white p-4"
+        >
+          <View className="w-9 h-9 rounded-xl bg-emerald-50 items-center justify-center mr-3">
+            <MessageSquarePlus size={17} color="#0F766E" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-gray-900 font-medium">Send Feedback</Text>
+            <Text className="text-gray-400 text-xs mt-0.5">
+              Report a bug or suggest something
+            </Text>
+          </View>
+        </TouchableOpacity>
+
         <TouchableOpacity
           onPress={handleLogout}
-          className="mt-5 flex-row items-center justify-center rounded-[22px] border border-red-100 bg-red-50 p-4"
+          className="mt-3 flex-row items-center justify-center rounded-[22px] border border-red-100 bg-red-50 p-4"
         >
           <LogOut size={18} color="#DC2626" />
           <Text className="ml-2 font-semibold text-red-600">Log Out</Text>
         </TouchableOpacity>
+
+        <View className="items-center mt-6">
+          <Text className="text-gray-400 text-xs">
+            Divine Netcare · v{appVersion}
+            {buildNumber ? ` (${buildNumber})` : ""}
+          </Text>
+        </View>
       </ScrollView>
 
-      {/* ── Edit modal ── */}
-      <Modal
+      {/* ── Edit Profile ── */}
+      <BottomSheetModal
         visible={editOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setEditOpen(false)}
+        onClose={() => setEditOpen(false)}
+        title="Edit Profile"
       >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View className="bg-white rounded-t-[28px] px-5 pt-5 pb-6 max-h-[85%]">
-            <View className="flex-row items-center justify-between mb-5">
-              <Text className="text-gray-900 text-lg font-bold">
-                Edit Profile
-              </Text>
-              <TouchableOpacity onPress={() => setEditOpen(false)}>
-                <X size={22} color="#6B7280" />
-              </TouchableOpacity>
+        <Text className="text-gray-700 text-sm font-medium mb-1.5">Phone</Text>
+        <TextInput
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="0244123456"
+          placeholderTextColor="#9CA3AF"
+          keyboardType="phone-pad"
+          returnKeyType="next"
+          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-4"
+        />
+
+        <Text className="text-gray-700 text-sm font-medium mb-1.5">
+          Photo URL
+        </Text>
+        <TextInput
+          value={photoUrl}
+          onChangeText={setPhotoUrl}
+          placeholder="https://..."
+          placeholderTextColor="#9CA3AF"
+          autoCapitalize="none"
+          returnKeyType="next"
+          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-4"
+        />
+
+        <Text className="text-gray-700 text-sm font-medium mb-1.5">Bio</Text>
+        <TextInput
+          value={bio}
+          onChangeText={setBio}
+          placeholder="A short bio about yourself"
+          placeholderTextColor="#9CA3AF"
+          multiline
+          numberOfLines={4}
+          returnKeyType="done"
+          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-5"
+          style={{ textAlignVertical: "top", minHeight: 108 }}
+        />
+
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={saving}
+          className={`rounded-xl py-4 items-center justify-center ${
+            saving ? "bg-green-300" : "bg-[#006B3C]"
+          }`}
+        >
+          {saving ? (
+            <ActivityIndicator color="#ffffff" size="small" />
+          ) : (
+            <Text className="text-white font-semibold text-base">
+              Save Changes
+            </Text>
+          )}
+        </TouchableOpacity>
+      </BottomSheetModal>
+
+      {/* ── Change Password ── */}
+      <BottomSheetModal
+        visible={pwModalOpen}
+        onClose={() => setPwModalOpen(false)}
+        title="Change Password"
+      >
+        <Text className="text-gray-700 text-sm font-medium mb-1.5">
+          Current Password
+        </Text>
+        <TextInput
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
+          placeholder="••••••••"
+          placeholderTextColor="#9CA3AF"
+          secureTextEntry
+          returnKeyType="next"
+          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-4"
+        />
+
+        <Text className="text-gray-700 text-sm font-medium mb-1.5">
+          New Password
+        </Text>
+        <TextInput
+          value={newPassword}
+          onChangeText={setNewPassword}
+          placeholder="At least 8 characters"
+          placeholderTextColor="#9CA3AF"
+          secureTextEntry
+          returnKeyType="next"
+          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-4"
+        />
+
+        <Text className="text-gray-700 text-sm font-medium mb-1.5">
+          Confirm New Password
+        </Text>
+        <TextInput
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          placeholder="Re-enter new password"
+          placeholderTextColor="#9CA3AF"
+          secureTextEntry
+          returnKeyType="done"
+          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-5"
+        />
+
+        <TouchableOpacity
+          onPress={handleChangePassword}
+          disabled={changingPw}
+          className={`rounded-xl py-4 items-center justify-center ${
+            changingPw ? "bg-green-300" : "bg-[#006B3C]"
+          }`}
+        >
+          {changingPw ? (
+            <ActivityIndicator color="#ffffff" size="small" />
+          ) : (
+            <Text className="text-white font-semibold text-base">
+              Update Password
+            </Text>
+          )}
+        </TouchableOpacity>
+      </BottomSheetModal>
+
+      {/* ── Feedback ── */}
+      <BottomSheetModal
+        visible={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        title="Send Feedback"
+      >
+        {feedbackSent ? (
+          <View className="items-center py-10">
+            <View className="w-14 h-14 rounded-full bg-emerald-50 items-center justify-center mb-3">
+              <Check size={26} color="#0F766E" />
+            </View>
+            <Text className="text-gray-900 font-semibold">Thank you!</Text>
+            <Text className="text-gray-400 text-sm mt-1">
+              Your feedback has been sent.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <Text className="text-gray-700 text-sm font-medium mb-2">
+              Category
+            </Text>
+            <View className="flex-row gap-2 mb-4">
+              {FEEDBACK_CATEGORIES.map((c) => (
+                <TouchableOpacity
+                  key={c.key}
+                  onPress={() => setFeedbackCategory(c.key)}
+                  className={`px-3.5 py-2 rounded-xl ${
+                    feedbackCategory === c.key ? "bg-[#006B3C]" : "bg-gray-100"
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-medium ${
+                      feedbackCategory === c.key
+                        ? "text-white"
+                        : "text-gray-600"
+                    }`}
+                  >
+                    {c.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingBottom: 8 }}
+            <Text className="text-gray-700 text-sm font-medium mb-1.5">
+              Message
+            </Text>
+            <TextInput
+              value={feedbackMessage}
+              onChangeText={setFeedbackMessage}
+              placeholder="Tell us what's on your mind..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={5}
+              returnKeyType="default"
+              className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-5"
+              style={{ textAlignVertical: "top", minHeight: 120 }}
+            />
+
+            <TouchableOpacity
+              onPress={handleSendFeedback}
+              disabled={sendingFeedback}
+              className={`rounded-xl py-4 items-center justify-center ${
+                sendingFeedback ? "bg-green-300" : "bg-[#006B3C]"
+              }`}
             >
-              <Text className="text-gray-700 text-sm font-medium mb-1.5">
-                Phone
-              </Text>
-              <TextInput
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="0244123456"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="phone-pad"
-                returnKeyType="next"
-                className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-4"
-              />
-
-              <Text className="text-gray-700 text-sm font-medium mb-1.5">
-                Photo URL
-              </Text>
-              <TextInput
-                value={photoUrl}
-                onChangeText={setPhotoUrl}
-                placeholder="https://..."
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="none"
-                returnKeyType="next"
-                className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-4"
-              />
-
-              <Text className="text-gray-700 text-sm font-medium mb-1.5">
-                Bio
-              </Text>
-              <TextInput
-                value={bio}
-                onChangeText={setBio}
-                placeholder="A short bio about yourself"
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={4}
-                returnKeyType="done"
-                className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-5"
-                style={{ textAlignVertical: "top", minHeight: 108 }}
-              />
-
-              <TouchableOpacity
-                onPress={handleSave}
-                disabled={saving}
-                className={`rounded-xl py-4 items-center justify-center ${
-                  saving ? "bg-green-300" : "bg-[#006B3C]"
-                }`}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <Text className="text-white font-semibold text-base">
-                    Save Changes
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+              {sendingFeedback ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text className="text-white font-semibold text-base">
+                  Send Feedback
+                </Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -358,9 +686,7 @@ function InfoRow({
 }) {
   return (
     <View
-      className={`flex-row items-center px-4 py-3.5 ${
-        !isLast ? "border-b border-gray-100" : ""
-      }`}
+      className={`flex-row items-center px-4 py-3.5 ${!isLast ? "border-b border-gray-100" : ""}`}
     >
       <View className="w-8 h-8 rounded-lg bg-gray-50 items-center justify-center mr-3">
         {icon}

@@ -1,8 +1,15 @@
-// app/(app)/leave.tsx
+// app/(app)/leave/index.tsx
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { ArrowLeft, Calendar, FileText, Plus, X } from "lucide-react-native";
+import {
+  ArrowLeft,
+  Calendar,
+  FileText,
+  Plus,
+  Users,
+  X,
+} from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,10 +26,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Staff } from "../../lib/api";
+import { Staff } from "../../../lib/api";
+import { useAuthStore } from "../../../lib/store";
 
 type LeaveType = "ANNUAL" | "SICK" | "EMERGENCY" | "MATERNITY" | "PATERNITY";
-
 type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 type LeaveApplication = {
@@ -53,10 +60,13 @@ const STATUS_STYLES: Record<
   REJECTED: { bg: "bg-red-50", text: "text-red-600", label: "Rejected" },
 };
 
-const fmtDate = (d: Date) => d.toISOString().split("T")[0]; // "YYYY-MM-DD"
+const fmtDate = (d: Date) => d.toISOString().split("T")[0];
 
 export default function LeaveScreen() {
   const router = useRouter();
+  const { user } = useAuthStore();
+  const canReviewLeave =
+    user?.role === "DEPT_HEAD" || user?.role === "SUPER_ADMIN";
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -126,8 +136,6 @@ export default function LeaveScreen() {
       resetForm();
       loadLeaves();
     } catch (err: any) {
-      // backend surfaces specific messages: insufficient balance,
-      // overlapping application, no balance found for this leave type
       Alert.alert(
         "Couldn't submit",
         err.response?.data?.message || "Something went wrong",
@@ -147,7 +155,6 @@ export default function LeaveScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50" edges={["top", "bottom"]}>
-      {/* ── Header ── */}
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -161,15 +168,25 @@ export default function LeaveScreen() {
           >
             <ArrowLeft size={20} color="#ffffff" />
           </TouchableOpacity>
-          <View className="flex-1 items-center pr-10">
+          <View className="flex-1 items-center">
             <Text className="text-white text-base font-semibold">Leave</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => setFormOpen(true)}
-            className="w-10 h-10 rounded-full bg-white/15 items-center justify-center"
-          >
-            <Plus size={20} color="#ffffff" />
-          </TouchableOpacity>
+          <View className="flex-row items-center">
+            {canReviewLeave && (
+              <TouchableOpacity
+                onPress={() => router.push("/(app)/leave/department")}
+                className="w-10 h-10 rounded-full bg-white/15 items-center justify-center mr-2"
+              >
+                <Users size={18} color="#ffffff" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => setFormOpen(true)}
+              className="w-10 h-10 rounded-full bg-white/15 items-center justify-center"
+            >
+              <Plus size={20} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
         </View>
       </LinearGradient>
 
@@ -241,7 +258,6 @@ export default function LeaveScreen() {
         </View>
       </ScrollView>
 
-      {/* ── New leave request modal ── */}
       <Modal
         visible={formOpen}
         animationType="slide"

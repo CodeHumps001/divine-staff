@@ -11,7 +11,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Staff, Users } from "../../../lib/api";
 import { useAuthStore } from "../../../lib/store";
 
@@ -61,7 +64,7 @@ export default function ChatListScreen() {
   const [staffList, setStaffList] = useState<StaffUser[]>([]);
   const [search, setSearch] = useState("");
   const [starting, setStarting] = useState(false);
-
+  const insets = useSafeAreaInsets();
   const loadConversations = useCallback(async () => {
     try {
       const res = await Staff.getConversations();
@@ -144,12 +147,13 @@ export default function ChatListScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top", "bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        className="mx-4 mt-3 rounded-[28px] px-4 py-4"
+        style={{ paddingTop: insets.top + 12 }}
+        className="mx-4 rounded-[28px] px-4 py-4"
       >
         <View className="flex-row items-center justify-between p-5">
           <TouchableOpacity

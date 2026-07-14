@@ -22,6 +22,8 @@ privateApi.interceptors.request.use(async (config) => {
 export const Auth = {
   login: (email: string, password: string) =>
     publicApi.post("/auth/login", { email, password }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    privateApi.patch("/auth/change-password", { currentPassword, newPassword }),
 };
 
 export const Staff = {
@@ -46,6 +48,29 @@ export const Staff = {
     privateApi.post("/upload/image", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
+  createAnnouncement: (data: {
+    title: string;
+    content: string;
+    departmentId?: string;
+  }) => privateApi.post("/announcements", data),
+  getDepartment: (id: string) => privateApi.get(`/departments/${id}`),
+  generateShifts: (data: {
+    departmentId: string;
+    month: number;
+    year: number;
+    mode: "auto" | "manual";
+    staffGroups?: { morning: string[]; night: string[]; rotating: string[] };
+  }) => privateApi.post("/shifts/generate", data),
+  submitFeedback: (message: string, category: string) =>
+    privateApi.post("/feedback", { message, category }),
+  savePushToken: (expoPushToken: string) =>
+    privateApi.post("/users/push-token", { expoPushToken }),
+  getDepartmentLeave: () => privateApi.get("/leave/department"),
+  reviewLeave: (
+    id: string,
+    status: "APPROVED" | "REJECTED",
+    reviewNote?: string,
+  ) => privateApi.patch(`/leave/${id}/review`, { status, reviewNote }),
 };
 
 export const Users = {

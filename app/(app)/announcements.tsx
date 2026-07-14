@@ -1,19 +1,28 @@
 // app/(app)/announcements.tsx
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { ArrowLeft, Megaphone, X } from "lucide-react-native";
+import { ArrowLeft, Megaphone, Plus, X } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Staff } from "../../lib/api";
+import { useAuthStore } from "../../lib/store";
 
 type Announcement = {
   id: string;
@@ -36,12 +45,79 @@ const timeAgo = (iso: string) => {
   return new Date(iso).toLocaleDateString();
 };
 
+// ── Reusable bottom-sheet modal that stays clear of the keyboard ──
+function BottomSheetModal({
+  visible,
+  onClose,
+  title,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View className="flex-1 bg-black/40 justify-end">
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View
+                className="bg-white rounded-t-[28px] px-5 pt-5"
+                style={{
+                  maxHeight: "85%",
+                  paddingBottom: Platform.OS === "ios" ? 34 : 20,
+                }}
+              >
+                <View className="flex-row items-center justify-between mb-5">
+                  <Text className="text-gray-900 text-lg font-bold">
+                    {title}
+                  </Text>
+                  <TouchableOpacity onPress={onClose}>
+                    <X size={22} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: 8 }}
+                >
+                  {children}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 export default function AnnouncementsScreen() {
   const router = useRouter();
+  const { user } = useAuthStore();
+  const canPost = user?.role === "DEPT_HEAD" || user?.role === "SUPER_ADMIN";
+  const insets = useSafeAreaInsets();
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [selected, setSelected] = useState<Announcement | null>(null);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [posting, setPosting] = useState(false);
 
   const loadAnnouncements = useCallback(async () => {
     try {
@@ -69,6 +145,35 @@ export default function AnnouncementsScreen() {
     loadAnnouncements();
   };
 
+  const resetForm = () => {
+    setTitle("");
+    setContent("");
+  };
+
+  const handlePost = async () => {
+    if (!title.trim() || !content.trim()) {
+      Alert.alert("Missing info", "Please add both a title and content.");
+      return;
+    }
+    setPosting(true);
+    try {
+      await Staff.createAnnouncement({
+        title: title.trim(),
+        content: content.trim(),
+      });
+      setFormOpen(false);
+      resetForm();
+      loadAnnouncements();
+    } catch (err: any) {
+      Alert.alert(
+        "Couldn't post",
+        err.response?.data?.message || "Something went wrong",
+      );
+    } finally {
+      setPosting(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
@@ -78,13 +183,13 @@ export default function AnnouncementsScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top", "bottom"]}>
-      {/* ── Header ── */}
+    <SafeAreaView className="flex-1 bg-[#F5F7F6]" edges={["bottom"]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        className="mx-4 mt-3 rounded-[28px] px-4 py-4"
+        style={{ paddingTop: insets.top + 12 }}
+        className="mx-4 rounded-[28px] px-4 py-4"
       >
         <View className="flex-row items-center p-5">
           <TouchableOpacity
@@ -98,6 +203,14 @@ export default function AnnouncementsScreen() {
               Announcements
             </Text>
           </View>
+          {canPost && (
+            <TouchableOpacity
+              onPress={() => setFormOpen(true)}
+              className="w-10 h-10 rounded-full items-center justify-center bg-white/15 absolute right-5"
+            >
+              <Plus size={20} color="#ffffff" />
+            </TouchableOpacity>
+          )}
         </View>
       </LinearGradient>
 
@@ -157,7 +270,7 @@ export default function AnnouncementsScreen() {
         </View>
       </ScrollView>
 
-      {/* ── Detail modal ── */}
+      {/* ── Detail view — read-only, no keyboard involved, stays a plain Modal ── */}
       <Modal
         visible={!!selected}
         animationType="slide"
@@ -186,6 +299,54 @@ export default function AnnouncementsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── New announcement form — now keyboard-safe via BottomSheetModal ── */}
+      <BottomSheetModal
+        visible={formOpen}
+        onClose={() => setFormOpen(false)}
+        title="New Announcement"
+      >
+        <Text className="text-gray-700 text-sm font-medium mb-1.5">Title</Text>
+        <TextInput
+          value={title}
+          onChangeText={setTitle}
+          placeholder="e.g. New PPE guidelines"
+          placeholderTextColor="#9CA3AF"
+          returnKeyType="next"
+          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-4"
+        />
+
+        <Text className="text-gray-700 text-sm font-medium mb-1.5">
+          Content
+        </Text>
+        <TextInput
+          value={content}
+          onChangeText={setContent}
+          placeholder="Write the announcement..."
+          placeholderTextColor="#9CA3AF"
+          multiline
+          numberOfLines={5}
+          returnKeyType="default"
+          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-6"
+          style={{ textAlignVertical: "top", minHeight: 120 }}
+        />
+
+        <TouchableOpacity
+          onPress={handlePost}
+          disabled={posting}
+          className={`rounded-xl py-4 items-center justify-center ${
+            posting ? "bg-green-300" : "bg-[#006B3C]"
+          }`}
+        >
+          {posting ? (
+            <ActivityIndicator color="#ffffff" size="small" />
+          ) : (
+            <Text className="text-white font-semibold text-base">
+              Post Announcement
+            </Text>
+          )}
+        </TouchableOpacity>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }

@@ -1,18 +1,31 @@
-// app/(app)/shifts.tsx — replaces the list rendering, keeps the same data loading
+// app/(app)/shifts.tsx
+import { Staff } from "@/lib/api";
+import { useAuthStore } from "@/lib/store";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Print from "expo-print";
 import { useRouter } from "expo-router";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react-native";
+import * as Sharing from "expo-sharing";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Settings2,
+} from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Staff } from "../../lib/api";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 type Shift = {
   id: string;
@@ -46,11 +59,17 @@ const shiftDotColor = (name: string) => {
 
 export default function ShiftsScreen() {
   const router = useRouter();
+  const { user } = useAuthStore();
+  const canManageShifts =
+    user?.role === "DEPT_HEAD" || user?.role === "SUPER_ADMIN";
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [viewMonth, setViewMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const insets = useSafeAreaInsets();
 
   const loadShifts = useCallback(async () => {
     try {
@@ -65,6 +84,7 @@ export default function ShiftsScreen() {
   useEffect(() => {
     loadShifts();
   }, [loadShifts]);
+
   const onRefresh = () => {
     setRefreshing(true);
     loadShifts();
@@ -92,6 +112,76 @@ export default function ShiftsScreen() {
 
   const selectedShift = shiftsByDay[selectedDate.toDateString()];
 
+  const handleExportPdf = async () => {
+    if (shifts.length === 0) {
+      Alert.alert("No shifts", "There are no shifts to export yet.");
+      return;
+    }
+    setExporting(true);
+    try {
+      const rows = [...shifts]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map(
+          (s) => `
+          <tr>
+            <td>${new Date(s.date).toDateString()}</td>
+            <td>${s.shiftType.name}</td>
+            <td>${s.shiftType.startTime} – ${s.shiftType.endTime}</td>
+          </tr>`,
+        )
+        .join("");
+
+      const html = `
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <style>
+              body { font-family: -apple-system, Helvetica, Arial, sans-serif; padding: 24px; color: #111827; }
+              h1 { color: #006B3C; font-size: 20px; margin-bottom: 4px; }
+              .subtitle { color: #6B7280; font-size: 12px; margin-bottom: 24px; }
+              table { width: 100%; border-collapse: collapse; }
+              th { text-align: left; background: #ECFDF5; color: #006B3C; padding: 10px 12px; font-size: 12px; }
+              td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #F3F4F6; }
+              tr:nth-child(even) { background: #FAFAFA; }
+            </style>
+          </head>
+          <body>
+            <h1>Divine Netcare — Shift Schedule</h1>
+            <div class="subtitle">
+              ${user?.firstName || ""} ${user?.lastName || ""} · Generated ${new Date().toDateString()}
+            </div>
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Shift</th><th>Time</th></tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: "Shift Schedule",
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        Alert.alert("Exported", `PDF saved at: ${uri}`);
+      }
+    } catch (err) {
+      console.log("PDF export error:", err);
+      Alert.alert(
+        "Export failed",
+        "Couldn't generate the PDF. Please try again.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
@@ -101,12 +191,13 @@ export default function ShiftsScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top", "bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        className="mx-4 mt-3 rounded-[28px] px-4 py-4"
+        style={{ paddingTop: insets.top + 12 }}
+        className="mx-4 rounded-[28px] px-4 py-4"
       >
         <View className="flex-row items-center p-5">
           <TouchableOpacity
@@ -115,10 +206,31 @@ export default function ShiftsScreen() {
           >
             <ArrowLeft size={20} color="#ffffff" />
           </TouchableOpacity>
-          <View className="flex-1 items-center pr-10">
+          <View className="flex-1 items-center">
             <Text className="text-white text-base font-semibold">
               My Shifts
             </Text>
+          </View>
+          <View className="flex-row items-center absolute right-5">
+            {canManageShifts && (
+              <TouchableOpacity
+                onPress={() => router.push("/(app)/shifts/generate")}
+                className="w-10 h-10 rounded-full items-center justify-center bg-white/15 mr-2"
+              >
+                <Settings2 size={18} color="#ffffff" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={handleExportPdf}
+              disabled={exporting}
+              className="w-10 h-10 rounded-full items-center justify-center bg-white/15"
+            >
+              {exporting ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Download size={18} color="#ffffff" />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       </LinearGradient>

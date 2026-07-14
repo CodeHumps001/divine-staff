@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, CheckCheck, Phone, Send, Video } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
@@ -14,7 +15,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Staff } from "../../../lib/api";
 import { disconnectSocket, getSocket } from "../../../lib/socket";
 import { useAuthStore } from "../../../lib/store";
@@ -132,6 +136,7 @@ export default function ChatThreadScreen() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // ─── ALL HOOKS MUST BE BEFORE ANY EARLY RETURN ──────────────────
 
@@ -260,85 +265,92 @@ export default function ChatThreadScreen() {
   // ─── RENDER ──────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      {/* ─── HEADER ────────────────────────────────────────────────── */}
-      <View className="px-3 pt-2 pb-3 flex-row items-center bg-[#065F46]">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="w-9 h-9 rounded-full bg-white/15 items-center justify-center"
-          activeOpacity={0.7}
-        >
-          <ArrowLeft size={20} color="#ffffff" />
-        </TouchableOpacity>
+    <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
+      <LinearGradient
+        colors={["#0F766E", "#15803D"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ paddingTop: insets.top + 12 }}
+        className="mx-4 rounded-[28px] px-4 py-4"
+      >
+        <View className="px-3 pt-2 pb-3 flex-row items-center ">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="w-9 h-9 rounded-full bg-white/15 items-center justify-center"
+            activeOpacity={0.7}
+          >
+            <ArrowLeft size={20} color="#ffffff" />
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          activeOpacity={0.7}
-          className="flex-row items-center flex-1 mx-2"
-          onPress={() => router.push({ pathname: "/(app)/profile" })}
-        >
-          {contactPhoto ? (
-            <Image
-              source={{ uri: contactPhoto }}
-              className="w-9 h-9 rounded-full border-2 border-white/30"
-            />
-          ) : (
-            <View className="w-9 h-9 rounded-full bg-white/20 items-center justify-center border-2 border-white/30">
-              <Text className="text-white font-semibold text-sm">
-                {contactName
-                  .split(" ")
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((part) => part[0])
-                  .join("")
-                  .toUpperCase() || "C"}
-              </Text>
-            </View>
-          )}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            className="flex-row items-center flex-1 mx-2"
+            onPress={() => router.push({ pathname: "/(app)/profile" })}
+          >
+            {contactPhoto ? (
+              <Image
+                source={{ uri: contactPhoto }}
+                className="w-9 h-9 rounded-full border-2 border-white/30"
+              />
+            ) : (
+              <View className="w-9 h-9 rounded-full bg-white/20 items-center justify-center border-2 border-white/30">
+                <Text className="text-white font-semibold text-sm">
+                  {contactName
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join("")
+                    .toUpperCase() || "C"}
+                </Text>
+              </View>
+            )}
 
-          <View className="ml-2 flex-1">
-            <Text
-              className="text-white text-base font-semibold"
-              numberOfLines={1}
-            >
-              {contactName}
-            </Text>
-            <View className="flex-row items-center mt-0.5">
-              <View className="w-1.5 h-1.5 rounded-full bg-emerald-300 mr-1.5" />
+            <View className="ml-2 flex-1">
               <Text
-                className="text-white/70 text-xs font-medium"
+                className="text-white text-base font-semibold"
                 numberOfLines={1}
               >
-                {isTyping ? "typing..." : contactStatus}
+                {contactName}
               </Text>
+              <View className="flex-row items-center mt-0.5">
+                <View className="w-1.5 h-1.5 rounded-full bg-emerald-300 mr-1.5" />
+                <Text
+                  className="text-white/70 text-xs font-medium"
+                  numberOfLines={1}
+                >
+                  {isTyping ? "typing..." : contactStatus}
+                </Text>
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
 
-        <View className="flex-row items-center gap-1">
-          <TouchableOpacity
-            className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
-            activeOpacity={0.7}
-          >
-            <Phone size={16} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
-            activeOpacity={0.7}
-          >
-            <Video size={16} color="#ffffff" />
-          </TouchableOpacity>
+          <View className="flex-row items-center gap-1">
+            <TouchableOpacity
+              className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
+              activeOpacity={0.7}
+            >
+              <Phone size={16} color="#ffffff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
+              activeOpacity={0.7}
+            >
+              <Video size={16} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* ─── CHAT AREA ────────────────────────────────────────────── */}
       <ImageBackground
         source={{
-          uri: "https://images.unsplash.com/photo-1557682250-33bd709cbe85?q=80&w=800&auto=format&fit=crop",
+          uri: "https://images.unsplash.com/photo-1584982751601-97dcc096659c?q=60&w=800&auto=format&fit=crop&blur=60",
         }}
         resizeMode="cover"
         className="flex-1"
       >
-        <View className="absolute inset-0 bg-white/90" />
+        <View className="absolute inset-0 bg-white/80" />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
