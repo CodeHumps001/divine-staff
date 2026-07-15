@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
   ArrowLeft,
+  Building2,
   Check,
   FileText,
   ShieldAlert,
@@ -20,9 +21,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Staff } from "../../../lib/api";
 import { useAuthStore } from "../../../lib/store";
+
+type Department = { id: string; name: string };
 
 type LeaveApplication = {
   id: string;
@@ -52,7 +58,10 @@ const STATUS_STYLES: Record<
 export default function DepartmentLeaveScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
+
   const canReview = user?.role === "DEPT_HEAD" || user?.role === "SUPER_ADMIN";
+  const isSuperAdminRole = user?.role === "SUPER_ADMIN";
 
   useEffect(() => {
     if (!canReview) router.replace("/(app)/leave");
@@ -62,15 +71,35 @@ export default function DepartmentLeaveScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [leaves, setLeaves] = useState<LeaveApplication[]>([]);
 
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(
+    user?.departmentId || null,
+  );
+
   const [reviewTarget, setReviewTarget] = useState<LeaveApplication | null>(
     null,
   );
   const [reviewNote, setReviewNote] = useState("");
   const [reviewing, setReviewing] = useState(false);
 
+  // ── Load department list, SUPER_ADMIN only ──
+  useEffect(() => {
+    if (!isSuperAdminRole) return;
+    Staff.getDepartments()
+      .then((res) => setDepartments(res.data.data || []))
+      .catch((err) => console.log("Departments load error:", err));
+  }, [isSuperAdminRole]);
+
   const loadLeaves = useCallback(async () => {
+    if (isSuperAdminRole && !selectedDeptId) {
+      setLoading(false);
+      setLeaves([]);
+      return;
+    }
     try {
-      const res = await Staff.getDepartmentLeave();
+      const res = await Staff.getDepartmentLeave(
+        isSuperAdminRole ? selectedDeptId! : undefined,
+      );
       const data: LeaveApplication[] = res.data.data || [];
       data.sort((a, b) => {
         if (a.status === "PENDING" && b.status !== "PENDING") return -1;
@@ -86,10 +115,13 @@ export default function DepartmentLeaveScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isSuperAdminRole, selectedDeptId]);
 
   useEffect(() => {
-    if (canReview) loadLeaves();
+    if (canReview) {
+      setLoading(true);
+      loadLeaves();
+    }
   }, [loadLeaves, canReview]);
 
   const onRefresh = () => {
@@ -141,12 +173,13 @@ export default function DepartmentLeaveScreen() {
   const pendingCount = leaves.filter((l) => l.status === "PENDING").length;
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top", "bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        className="mx-4 mt-3 rounded-[28px] px-4 py-4"
+        style={{ paddingTop: insets.top + 12 }}
+        className="mx-4 rounded-[28px] px-4 py-4"
       >
         <View className="flex-row items-center p-5">
           <TouchableOpacity
@@ -170,8 +203,52 @@ export default function DepartmentLeaveScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        {/* ── Department picker, SUPER_ADMIN only ── */}
+        {isSuperAdminRole && (
+          <View className="mx-6 mt-6 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <View className="flex-row items-center mb-3">
+              <Building2 size={16} color="#006B3C" />
+              <Text className="text-gray-900 font-semibold ml-2">
+                Department
+              </Text>
+            </View>
+            {departments.length === 0 ? (
+              <Text className="text-gray-400 text-sm">
+                Loading departments...
+              </Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {departments.map((d) => (
+                  <TouchableOpacity
+                    key={d.id}
+                    onPress={() => setSelectedDeptId(d.id)}
+                    className={`px-4 py-2 rounded-xl mr-2 ${
+                      selectedDeptId === d.id ? "bg-[#006B3C]" : "bg-gray-100"
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm font-medium ${
+                        selectedDeptId === d.id ? "text-white" : "text-gray-600"
+                      }`}
+                    >
+                      {d.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
+
         <View className="mx-6 mt-6">
-          {leaves.length === 0 ? (
+          {isSuperAdminRole && !selectedDeptId ? (
+            <View className="items-center py-16 bg-white rounded-2xl border border-gray-100">
+              <Building2 size={32} color="#D1D5DB" />
+              <Text className="text-gray-400 text-sm mt-3 text-center px-6">
+                Select a department above to view its leave requests
+              </Text>
+            </View>
+          ) : leaves.length === 0 ? (
             <View className="items-center py-16 bg-white rounded-2xl border border-gray-100">
               <FileText size={32} color="#D1D5DB" />
               <Text className="text-gray-400 text-sm mt-3">
@@ -232,6 +309,7 @@ export default function DepartmentLeaveScreen() {
         </View>
       </ScrollView>
 
+      {/* ── Review modal ── */}
       <Modal
         visible={!!reviewTarget}
         animationType="slide"

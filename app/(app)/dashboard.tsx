@@ -5,12 +5,15 @@ import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import {
   Bell,
+  Building2,
   Calendar,
   CalendarCheck,
   ChevronRight,
   Clock3,
   FileText,
   Lock,
+  Megaphone,
+  Settings,
   Settings2,
   TimerReset,
   User as UserIcon,
@@ -32,6 +35,16 @@ import {
 } from "react-native-safe-area-context";
 import { Staff } from "../../lib/api";
 import { useAuthStore } from "../../lib/store";
+
+type Department = { id: string; name: string };
+type DeptAttendanceRecord = {
+  id: string;
+  clockIn: string;
+  clockOut: string | null;
+  status: "PRESENT" | "LATE" | "ABSENT";
+  user: { firstName: string; lastName: string };
+  shift: { date: string; shiftType: { name: string } };
+};
 
 type AttendanceRecord = {
   id: string;
@@ -177,6 +190,63 @@ function QuickAction({
   );
 }
 
+// in SquareQuickAction, add an optional badge prop
+function SquareQuickAction({
+  icon,
+  label,
+  onPress,
+  accentColor,
+  accentBg,
+  badgeCount,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+  accentColor: string;
+  accentBg: string;
+  badgeCount?: number;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      className="bg-white rounded-[18px] items-center justify-center gap-2 border border-gray-100 px-3"
+      style={{
+        width: 108,
+        height: 108,
+        shadowColor: "#0F172A",
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 2,
+      }}
+    >
+      <View className="relative">
+        <View
+          className="w-11 h-11 rounded-full items-center justify-center"
+          style={{ backgroundColor: accentBg }}
+        >
+          {icon}
+        </View>
+        {!!badgeCount && badgeCount > 0 && (
+          <View className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[18px] h-[18px] items-center justify-center px-1">
+            <Text className="text-white text-[10px] font-bold">
+              {badgeCount > 9 ? "9+" : badgeCount}
+            </Text>
+          </View>
+        )}
+      </View>
+      <Text
+        className="text-[11px] font-medium text-center leading-4"
+        style={{ color: accentColor }}
+        numberOfLines={2}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function DashboardScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -202,6 +272,37 @@ export default function DashboardScreen() {
   const [approvalRate, setApprovalRate] = useState<string | null>(null);
   const lastAnnouncementId = useRef<string | null>(null);
   const lastShiftId = useRef<string | null>(null);
+
+  // inside DashboardScreen component:
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
+  const [deptAttendance, setDeptAttendance] = useState<DeptAttendanceRecord[]>(
+    [],
+  );
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    Staff.getDepartments()
+      .then((res) => setDepartments(res.data.data || []))
+      .catch((err) => console.log("Departments load error:", err));
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (!isSuperAdmin || !selectedDeptId) return;
+    setLoadingAttendance(true);
+    Staff.getDepartmentAttendance(selectedDeptId)
+      .then((res) => {
+        const records: DeptAttendanceRecord[] = res.data.data || [];
+        records.sort(
+          (a, b) =>
+            new Date(b.clockIn).getTime() - new Date(a.clockIn).getTime(),
+        );
+        setDeptAttendance(records.slice(0, 6));
+      })
+      .catch((err) => console.log("Dept attendance load error:", err))
+      .finally(() => setLoadingAttendance(false));
+  }, [isSuperAdmin, selectedDeptId]);
 
   const scheduleReminder = useCallback(async (title: string, body: string) => {
     const settings = await Notifications.requestPermissionsAsync();
@@ -470,7 +571,6 @@ export default function DashboardScreen() {
             </View>
           </LinearGradient>
         </View>
-
         {/* ─── CLOCK IN CARD — hidden for SUPER_ADMIN (no personal shifts) ── */}
         {!isSuperAdmin && (
           <View className="mx-4 mt-4">
@@ -546,6 +646,168 @@ export default function DashboardScreen() {
           </View>
         )}
 
+        {/* ─── ADMIN QUICK ACTIONS — SUPER_ADMIN only, swipeable square cards ── */}
+        {isSuperAdmin && (
+          <View className="mx-4 mt-5">
+            <Text className="text-gray-700 text-[13px] font-semibold mb-2.5">
+              Admin Actions
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingRight: 10 }}
+            >
+              <View className="flex-row gap-3">
+                <SquareQuickAction
+                  icon={<Megaphone size={20} color="#059669" />}
+                  label="Post Announcement"
+                  onPress={() => router.push("/(app)/announcements")}
+                  accentColor="#059669"
+                  accentBg="#D1FAE5"
+                />
+                <SquareQuickAction
+                  icon={<Settings2 size={20} color="#DB2777" />}
+                  label="Generate Schedule"
+                  onPress={() => router.push("/(app)/shifts/generate")}
+                  accentColor="#DB2777"
+                  accentBg="#FCE7F3"
+                />
+                <SquareQuickAction
+                  icon={<Users size={20} color="#0891B2" />}
+                  label="Review Leave"
+                  onPress={() => router.push("/(app)/leave/department")}
+                  accentColor="#0891B2"
+                  accentBg="#CFFAFE"
+                />
+                <SquareQuickAction
+                  icon={<Settings size={20} color="#7C3AED" />}
+                  label="Hospital Settings"
+                  onPress={() => router.push("/(app)/settings/hospital")}
+                  accentColor="#7C3AED"
+                  accentBg="#EDE9FE"
+                />
+              </View>
+            </ScrollView>
+          </View>
+        )}
+        {/* ─── ATTENDANCE LOGS — SUPER_ADMIN only ────────────────── */}
+        {isSuperAdmin && (
+          <View className="mx-4 mt-5">
+            <View className="flex-row items-center justify-between mb-2.5">
+              <Text className="text-gray-700 text-[13px] font-semibold">
+                Attendance Logs
+              </Text>
+            </View>
+
+            <View
+              className="bg-white rounded-[24px] p-4 border border-gray-100"
+              style={{
+                shadowColor: "#0F172A",
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 2,
+              }}
+            >
+              {/* department picker */}
+              <View className="flex-row items-center mb-3">
+                <Building2 size={15} color="#006B3C" />
+                <Text className="text-gray-900 font-semibold ml-2 text-sm">
+                  Department
+                </Text>
+              </View>
+              {departments.length === 0 ? (
+                <Text className="text-gray-400 text-sm">
+                  Loading departments...
+                </Text>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  className="mb-4"
+                >
+                  {departments.map((d) => (
+                    <TouchableOpacity
+                      key={d.id}
+                      onPress={() => setSelectedDeptId(d.id)}
+                      className={`px-3.5 py-1.5 rounded-xl mr-2 ${
+                        selectedDeptId === d.id ? "bg-[#006B3C]" : "bg-gray-100"
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-medium ${
+                          selectedDeptId === d.id
+                            ? "text-white"
+                            : "text-gray-600"
+                        }`}
+                      >
+                        {d.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+
+              {/* records */}
+              {!selectedDeptId ? (
+                <Text className="text-gray-400 text-sm text-center py-4">
+                  Select a department to view logs
+                </Text>
+              ) : loadingAttendance ? (
+                <ActivityIndicator
+                  size="small"
+                  color="#006B3C"
+                  className="my-4"
+                />
+              ) : deptAttendance.length === 0 ? (
+                <Text className="text-gray-400 text-sm text-center py-4">
+                  No recent attendance records
+                </Text>
+              ) : (
+                deptAttendance.map((r) => (
+                  <View
+                    key={r.id}
+                    className="flex-row items-center justify-between py-2.5 border-b border-gray-50"
+                  >
+                    <View className="flex-1 pr-2">
+                      <Text className="text-gray-900 text-sm font-medium">
+                        {r.user.firstName} {r.user.lastName}
+                      </Text>
+                      <Text className="text-gray-400 text-xs mt-0.5">
+                        {new Date(r.shift.date).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}{" "}
+                        · {r.shift.shiftType.name}
+                      </Text>
+                    </View>
+                    <View
+                      className={`px-2.5 py-1 rounded-full ${
+                        r.status === "PRESENT"
+                          ? "bg-green-50"
+                          : r.status === "LATE"
+                            ? "bg-amber-50"
+                            : "bg-red-50"
+                      }`}
+                    >
+                      <Text
+                        className={`text-[10px] font-semibold ${
+                          r.status === "PRESENT"
+                            ? "text-green-600"
+                            : r.status === "LATE"
+                              ? "text-amber-600"
+                              : "text-red-600"
+                        }`}
+                      >
+                        {r.status}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          </View>
+        )}
         {/* ─── INSIGHTS CAROUSEL — hidden for SUPER_ADMIN ────────── */}
         {!isSuperAdmin && (
           <View className="mx-4 mt-4">
@@ -596,7 +858,6 @@ export default function DashboardScreen() {
             </ScrollView>
           </View>
         )}
-
         {/* ─── QUICK ACTIONS — hidden entirely for SUPER_ADMIN ───── */}
         {!isSuperAdmin && (
           <View className="mx-4 mt-5">
@@ -653,7 +914,6 @@ export default function DashboardScreen() {
             </View>
           </View>
         )}
-
         {/* ─── UPCOMING SHIFT — hidden for SUPER_ADMIN ───────────── */}
         {!isSuperAdmin && (
           <View className="mx-4 mt-5">
@@ -732,7 +992,6 @@ export default function DashboardScreen() {
             </View>
           </View>
         )}
-
         {/* ─── LATEST ANNOUNCEMENT — visible to everyone, incl. SUPER_ADMIN ── */}
         {latestAnnouncement && (
           <TouchableOpacity

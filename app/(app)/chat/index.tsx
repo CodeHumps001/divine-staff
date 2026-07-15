@@ -1,9 +1,16 @@
+// app/(app)/chat/index.tsx
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { MessageCircle, Plus, X } from "lucide-react-native";
+import {
+  MessageCircle,
+  Plus,
+  Users as UsersIcon,
+  X,
+} from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   RefreshControl,
   ScrollView,
   Text,
@@ -40,8 +47,9 @@ type Conversation = {
   id: string;
   type: "DIRECT" | "GROUP";
   departmentId: string | null;
+  department?: { name: string } | null;
   members: Member[];
-  messages: LastMessage[]; // last message only, per getMyConversations
+  messages: LastMessage[];
 };
 
 type StaffUser = {
@@ -52,9 +60,51 @@ type StaffUser = {
   profile?: { photoUrl?: string | null } | null;
 };
 
+// ── Avatar with photo fallback to initials ──
+function Avatar({
+  photoUrl,
+  name,
+  isGroup,
+  size = 44,
+}: {
+  photoUrl?: string | null;
+  name: string;
+  isGroup?: boolean;
+  size?: number;
+}) {
+  if (photoUrl) {
+    return (
+      <Image
+        source={{ uri: photoUrl }}
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+      />
+    );
+  }
+  if (isGroup) {
+    return (
+      <View
+        className="bg-emerald-100 items-center justify-center"
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+      >
+        <UsersIcon size={size * 0.42} color="#0F766E" />
+      </View>
+    );
+  }
+  const initials = name.charAt(0).toUpperCase() || "?";
+  return (
+    <View
+      className="bg-green-50 items-center justify-center"
+      style={{ width: size, height: size, borderRadius: size / 2 }}
+    >
+      <Text className="text-[#006B3C] font-bold">{initials}</Text>
+    </View>
+  );
+}
+
 export default function ChatListScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -64,7 +114,7 @@ export default function ChatListScreen() {
   const [staffList, setStaffList] = useState<StaffUser[]>([]);
   const [search, setSearch] = useState("");
   const [starting, setStarting] = useState(false);
-  const insets = useSafeAreaInsets();
+
   const loadConversations = useCallback(async () => {
     try {
       const res = await Staff.getConversations();
@@ -156,12 +206,9 @@ export default function ChatListScreen() {
         className="mx-4 rounded-[28px] px-4 py-4"
       >
         <View className="flex-row items-center justify-between p-5">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="w-10 h-10 rounded-full items-center justify-center bg-white/15"
-          >
+          <View className="w-10 h-10 rounded-full items-center justify-center bg-white/15">
             <MessageCircle size={20} color="#ffffff" />
-          </TouchableOpacity>
+          </View>
           <View className="flex-1 items-center pr-10">
             <Text className="text-white text-base font-semibold">Chat</Text>
           </View>
@@ -193,10 +240,12 @@ export default function ChatListScreen() {
             conversations.map((conv) => {
               const other = getOtherMember(conv);
               const last = conv.messages[0];
-              const displayName =
-                conv.type === "DIRECT"
-                  ? `${other?.firstName || "Unknown"} ${other?.lastName || ""}`
-                  : "Department Group";
+              const isGroup = conv.type === "GROUP";
+              const displayName = isGroup
+                ? conv.department?.name
+                  ? `${conv.department.name} Team`
+                  : "Group Chat"
+                : `${other?.firstName || "Unknown"} ${other?.lastName || ""}`.trim();
 
               return (
                 <TouchableOpacity
@@ -207,23 +256,42 @@ export default function ChatListScreen() {
                       params: {
                         id: conv.id,
                         contactName: displayName,
-                        contactPhoto: other?.profile?.photoUrl || "",
-                        contactStatus: other?.isActive ? "Active now" : "Away",
+                        contactPhoto: isGroup
+                          ? ""
+                          : other?.profile?.photoUrl || "",
+                        contactStatus: isGroup
+                          ? `${conv.members.length} members`
+                          : other?.isActive
+                            ? "Active now"
+                            : "Away",
+                        isGroup: isGroup ? "1" : "0",
                       },
                     })
                   }
                   activeOpacity={0.85}
                   className="bg-white rounded-2xl p-4 border border-gray-100 mb-2 flex-row items-center"
                 >
-                  <View className="w-11 h-11 rounded-full bg-green-50 items-center justify-center mr-3">
-                    <Text className="text-[#006B3C] font-bold">
-                      {displayName.charAt(0)}
-                    </Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-gray-900 font-semibold">
-                      {displayName}
-                    </Text>
+                  <Avatar
+                    photoUrl={isGroup ? null : other?.profile?.photoUrl}
+                    name={displayName}
+                    isGroup={isGroup}
+                  />
+                  <View className="flex-1 ml-3">
+                    <View className="flex-row items-center">
+                      <Text
+                        className="text-gray-900 font-semibold"
+                        numberOfLines={1}
+                      >
+                        {displayName}
+                      </Text>
+                      {isGroup && (
+                        <View className="ml-2 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          <Text className="text-emerald-600 text-[10px] font-semibold">
+                            Group
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     <Text
                       className="text-gray-400 text-sm mt-0.5"
                       numberOfLines={1}
@@ -264,12 +332,12 @@ export default function ChatListScreen() {
                   disabled={starting}
                   className="flex-row items-center py-3 border-b border-gray-50"
                 >
-                  <View className="w-9 h-9 rounded-full bg-green-50 items-center justify-center mr-3">
-                    <Text className="text-[#006B3C] font-bold text-xs">
-                      {s.firstName.charAt(0)}
-                    </Text>
-                  </View>
-                  <View>
+                  <Avatar
+                    photoUrl={s.profile?.photoUrl}
+                    name={s.firstName}
+                    size={36}
+                  />
+                  <View className="ml-3">
                     <Text className="text-gray-900 text-sm font-medium">
                       {s.firstName} {s.lastName}
                     </Text>

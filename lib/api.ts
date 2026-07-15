@@ -65,12 +65,31 @@ export const Staff = {
     privateApi.post("/feedback", { message, category }),
   savePushToken: (expoPushToken: string) =>
     privateApi.post("/users/push-token", { expoPushToken }),
-  getDepartmentLeave: () => privateApi.get("/leave/department"),
+  // getDepartmentLeave: () => privateApi.get("/leave/department"),
+  getDepartments: () => privateApi.get("/departments"),
+  getDepartmentLeave: (departmentId?: string) =>
+    privateApi.get("/leave/department", {
+      params: departmentId ? { departmentId } : {},
+    }),
   reviewLeave: (
     id: string,
     status: "APPROVED" | "REJECTED",
     reviewNote?: string,
   ) => privateApi.patch(`/leave/${id}/review`, { status, reviewNote }),
+  getDepartmentAttendance: (departmentId: string) =>
+    privateApi.get(`/attendance/department/${departmentId}`),
+
+  getHospitalSettings: () => privateApi.get("/settings"),
+  updateHospitalSettings: (data: {
+    name: string;
+    latitude: number;
+    longitude: number;
+    geofenceRadius?: number;
+    address?: string;
+    phone?: string;
+    email?: string;
+    logoUrl?: string;
+  }) => privateApi.put("/settings", data),
 };
 
 export const Users = {

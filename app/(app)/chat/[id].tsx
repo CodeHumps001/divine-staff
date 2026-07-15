@@ -1,10 +1,17 @@
+// app/(app)/chat/[id].tsx
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, CheckCheck, Phone, Send, Video } from "lucide-react-native";
+import {
+  ArrowLeft,
+  CheckCheck,
+  Phone,
+  Send,
+  Users as UsersIcon,
+  Video,
+} from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Image,
   ImageBackground,
@@ -31,9 +38,6 @@ type Message = {
   sender: { firstName: string; lastName: string; position: string };
 };
 
-const { width } = Dimensions.get("window");
-
-// ─── Time Formatter ────────────────────────────────────────────────
 const formatTime = (date: string) => {
   return new Date(date).toLocaleTimeString([], {
     hour: "2-digit",
@@ -41,7 +45,6 @@ const formatTime = (date: string) => {
   });
 };
 
-// ─── Date Formatter ────────────────────────────────────────────────
 const formatDate = (date: string) => {
   const d = new Date(date);
   const today = new Date();
@@ -57,15 +60,16 @@ const formatDate = (date: string) => {
   });
 };
 
-// ─── Message Bubble ────────────────────────────────────────────────
 function MessageBubble({
   message,
   isMine,
   isGrouped,
+  showSenderName,
 }: {
   message: Message;
   isMine: boolean;
   isGrouped: boolean;
+  showSenderName: boolean;
 }) {
   const [showTime, setShowTime] = useState(false);
 
@@ -75,7 +79,7 @@ function MessageBubble({
       onPress={() => setShowTime(!showTime)}
       className={`mb-1 max-w-[80%] ${isMine ? "self-end items-end" : "self-start items-start"}`}
     >
-      {!isMine && !isGrouped && (
+      {!isMine && !isGrouped && showSenderName && (
         <Text className="text-gray-400 text-[11px] font-medium mb-1 ml-1">
           {message.sender.firstName}
         </Text>
@@ -101,15 +105,13 @@ function MessageBubble({
 
         <View className="flex-row items-center justify-end mt-1">
           <Text
-            className={`text-[9px] ${
-              isMine ? "text-white/60" : "text-gray-400"
-            }`}
+            className={`text-[9px] ${isMine ? "text-white/60" : "text-gray-400"}`}
           >
             {formatTime(message.createdAt)}
           </Text>
           {isMine && (
             <View className="ml-1">
-              <CheckCheck size={12} color={isMine ? "#ffffff" : "#94A3B8"} />
+              <CheckCheck size={12} color="#ffffff" />
             </View>
           )}
         </View>
@@ -124,8 +126,10 @@ export default function ChatThreadScreen() {
     contactName?: string;
     contactPhoto?: string;
     contactStatus?: string;
+    isGroup?: string;
   }>();
   const id = typeof params.id === "string" ? params.id : "";
+  const isGroup = params.isGroup === "1";
   const router = useRouter();
   const { user } = useAuthStore();
   const listRef = useRef<FlatList>(null);
@@ -135,22 +139,20 @@ export default function ChatThreadScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
+
+  // ── Track which users are typing, by id → name (supports multiple in a group) ──
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
   const insets = useSafeAreaInsets();
 
-  // ─── ALL HOOKS MUST BE BEFORE ANY EARLY RETURN ──────────────────
-
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (messages.length > 0) {
       listRef.current?.scrollToEnd({ animated: true });
     }
   }, [messages.length]);
 
-  // Socket connection and message loading
   useEffect(() => {
     let socketRef: any = null;
-    let typingTimeout: ReturnType<typeof setTimeout> | undefined;
+    const typingTimeouts: Record<string, ReturnType<typeof setTimeout>> = {};
 
     const setup = async () => {
       try {
@@ -168,12 +170,37 @@ export default function ChatThreadScreen() {
 
       socket.on("new_message", (msg: Message) => {
         setMessages((prev) => [...prev, msg]);
+        // clear typing indicator for whoever just sent a message
+        setTypingUsers((prev) => {
+          const next = { ...prev };
+          delete next[msg.senderId];
+          return next;
+        });
       });
 
-      socket.on("typing", () => {
-        setIsTyping(true);
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => setIsTyping(false), 2000);
+      // ── Fixed: backend emits "user_typing" with { userId }, not "typing" ──
+      socket.on("user_typing", ({ userId }: { userId: string }) => {
+        if (userId === user?.id) return; // ignore our own typing echo
+
+        // find the sender's name from recent messages, fallback to generic label
+        const knownSender = messages.find((m) => m.senderId === userId)?.sender;
+        const name = knownSender
+          ? knownSender.firstName
+          : isGroup
+            ? "Someone"
+            : (typeof params.contactName === "string" && params.contactName) ||
+              "Someone";
+
+        setTypingUsers((prev) => ({ ...prev, [userId]: name }));
+
+        clearTimeout(typingTimeouts[userId]);
+        typingTimeouts[userId] = setTimeout(() => {
+          setTypingUsers((prev) => {
+            const next = { ...prev };
+            delete next[userId];
+            return next;
+          });
+        }, 2500);
       });
 
       socket.on("error", (err: { message: string }) => {
@@ -187,15 +214,13 @@ export default function ChatThreadScreen() {
       if (socketRef) {
         socketRef.emit("leave_conversation", id);
         socketRef.off("new_message");
-        socketRef.off("typing");
+        socketRef.off("user_typing");
         socketRef.off("error");
       }
-      clearTimeout(typingTimeout);
+      Object.values(typingTimeouts).forEach(clearTimeout);
       disconnectSocket();
     };
   }, [id]);
-
-  // ─── EARLY RETURN AFTER ALL HOOKS ──────────────────────────────
 
   if (loading) {
     return (
@@ -210,8 +235,6 @@ export default function ChatThreadScreen() {
     );
   }
 
-  // ─── COMPUTED VALUES ────────────────────────────────────────────
-
   const contactName =
     typeof params.contactName === "string" && params.contactName.trim()
       ? params.contactName
@@ -223,7 +246,14 @@ export default function ChatThreadScreen() {
       ? params.contactStatus
       : "Active now";
 
-  // Group messages by date
+  const typingNames = Object.values(typingUsers);
+  const typingLabel =
+    typingNames.length === 0
+      ? null
+      : typingNames.length === 1
+        ? `${typingNames[0]} is typing...`
+        : `${typingNames.length} people are typing...`;
+
   const groupedMessages: { date: string; messages: Message[] }[] = [];
   messages.forEach((msg) => {
     const dateKey = new Date(msg.createdAt).toDateString();
@@ -234,8 +264,6 @@ export default function ChatThreadScreen() {
       groupedMessages.push({ date: dateKey, messages: [msg] });
     }
   });
-
-  // ─── HANDLERS ────────────────────────────────────────────────────
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -262,8 +290,6 @@ export default function ChatThreadScreen() {
     }
   };
 
-  // ─── RENDER ──────────────────────────────────────────────────────
-
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <LinearGradient
@@ -273,7 +299,7 @@ export default function ChatThreadScreen() {
         style={{ paddingTop: insets.top + 12 }}
         className="mx-4 rounded-[28px] px-4 py-4"
       >
-        <View className="px-3 pt-2 pb-3 flex-row items-center ">
+        <View className="px-3 pt-2 pb-3 flex-row items-center">
           <TouchableOpacity
             onPress={() => router.back()}
             className="w-9 h-9 rounded-full bg-white/15 items-center justify-center"
@@ -282,16 +308,16 @@ export default function ChatThreadScreen() {
             <ArrowLeft size={20} color="#ffffff" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            className="flex-row items-center flex-1 mx-2"
-            onPress={() => router.push({ pathname: "/(app)/profile" })}
-          >
+          <View className="flex-row items-center flex-1 mx-2">
             {contactPhoto ? (
               <Image
                 source={{ uri: contactPhoto }}
                 className="w-9 h-9 rounded-full border-2 border-white/30"
               />
+            ) : isGroup ? (
+              <View className="w-9 h-9 rounded-full bg-white/20 items-center justify-center border-2 border-white/30">
+                <UsersIcon size={16} color="#ffffff" />
+              </View>
             ) : (
               <View className="w-9 h-9 rounded-full bg-white/20 items-center justify-center border-2 border-white/30">
                 <Text className="text-white font-semibold text-sm">
@@ -314,35 +340,38 @@ export default function ChatThreadScreen() {
                 {contactName}
               </Text>
               <View className="flex-row items-center mt-0.5">
-                <View className="w-1.5 h-1.5 rounded-full bg-emerald-300 mr-1.5" />
+                {!isGroup && (
+                  <View className="w-1.5 h-1.5 rounded-full bg-emerald-300 mr-1.5" />
+                )}
                 <Text
                   className="text-white/70 text-xs font-medium"
                   numberOfLines={1}
                 >
-                  {isTyping ? "typing..." : contactStatus}
+                  {typingLabel || contactStatus}
                 </Text>
               </View>
             </View>
-          </TouchableOpacity>
-
-          <View className="flex-row items-center gap-1">
-            <TouchableOpacity
-              className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
-              activeOpacity={0.7}
-            >
-              <Phone size={16} color="#ffffff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
-              activeOpacity={0.7}
-            >
-              <Video size={16} color="#ffffff" />
-            </TouchableOpacity>
           </View>
+
+          {!isGroup && (
+            <View className="flex-row items-center gap-1">
+              <TouchableOpacity
+                className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
+                activeOpacity={0.7}
+              >
+                <Phone size={16} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
+                activeOpacity={0.7}
+              >
+                <Video size={16} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </LinearGradient>
 
-      {/* ─── CHAT AREA ────────────────────────────────────────────── */}
       <ImageBackground
         source={{
           uri: "https://images.unsplash.com/photo-1584982751601-97dcc096659c?q=60&w=800&auto=format&fit=crop&blur=60",
@@ -371,7 +400,6 @@ export default function ChatThreadScreen() {
             }
             renderItem={({ item }) => (
               <View>
-                {/* Date Separator */}
                 <View className="items-center my-3">
                   <View className="bg-gray-200/80 px-4 py-1.5 rounded-full">
                     <Text className="text-gray-500 text-[10px] font-medium">
@@ -390,6 +418,7 @@ export default function ChatThreadScreen() {
                       message={msg}
                       isMine={isMine}
                       isGrouped={grouped}
+                      showSenderName={isGroup}
                     />
                   );
                 })}
@@ -397,16 +426,14 @@ export default function ChatThreadScreen() {
             )}
           />
 
-          {/* ─── TYPING INDICATOR ────────────────────────────────── */}
-          {isTyping && (
+          {typingLabel && (
             <View className="px-4 pb-2 flex-row items-center">
               <View className="bg-gray-200/80 px-4 py-2 rounded-2xl rounded-tl-sm">
-                <Text className="text-gray-500 text-xs">typing...</Text>
+                <Text className="text-gray-500 text-xs">{typingLabel}</Text>
               </View>
             </View>
           )}
 
-          {/* ─── INPUT BAR ────────────────────────────────────────── */}
           <View className="px-3 py-3 bg-white/95 border-t border-gray-100/80">
             <View className="flex-row items-end gap-2">
               <View className="flex-1 rounded-[24px] border border-gray-200 bg-white px-4 py-2 shadow-sm">
