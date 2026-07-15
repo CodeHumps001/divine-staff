@@ -13,11 +13,13 @@ import {
   FileText,
   Lock,
   Megaphone,
+  MessageSquare,
   Settings,
   Settings2,
   TimerReset,
   User as UserIcon,
   Users,
+  UsersIcon,
 } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -190,7 +192,6 @@ function QuickAction({
   );
 }
 
-// in SquareQuickAction, add an optional badge prop
 function SquareQuickAction({
   icon,
   label,
@@ -273,7 +274,6 @@ export default function DashboardScreen() {
   const lastAnnouncementId = useRef<string | null>(null);
   const lastShiftId = useRef<string | null>(null);
 
-  // inside DashboardScreen component:
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
   const [deptAttendance, setDeptAttendance] = useState<DeptAttendanceRecord[]>(
@@ -319,10 +319,10 @@ export default function DashboardScreen() {
     });
   }, []);
 
+  // ── Full dashboard load — used on mount, pull-to-refresh, and manual refresh ──
+  // This is the ONLY place that derives `clockedIn` from the attendance list.
   const loadDashboard = useCallback(async () => {
     try {
-      // SUPER_ADMIN has no personal shifts/leave/attendance —
-      // skip those calls entirely for that role
       if (isSuperAdmin) {
         const announcementsRes = await Staff.getAnnouncements().catch(
           () => null,
@@ -359,19 +359,16 @@ export default function DashboardScreen() {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
 
-      // Clock status
       const todayRecord = records.find((r) =>
         isSameDay(new Date(r.shift.date), today),
       );
       setClockedIn(!!todayRecord && !todayRecord.clockOut);
 
-      // Today's shifts
       const todayShifts = shifts.filter((s) =>
         isSameDay(new Date(s.date), today),
       );
       setTodaysShiftCount(todayShifts.length);
 
-      // Attendance rate
       const pastShifts = shifts.filter((s) => new Date(s.date) < startOfToday);
       if (pastShifts.length > 0) {
         const covered = pastShifts.filter((s) =>
@@ -388,7 +385,6 @@ export default function DashboardScreen() {
         setAttendanceRate("—");
       }
 
-      // Leave stats
       if (leaveRes.status === "fulfilled") {
         const leaves: LeaveApplication[] = leaveRes.value.data.data || [];
         const total = leaves.length;
@@ -401,7 +397,6 @@ export default function DashboardScreen() {
         );
       }
 
-      // Upcoming shift
       const upcoming = shifts
         .filter((s) => new Date(s.date) >= startOfToday)
         .sort(
@@ -422,7 +417,6 @@ export default function DashboardScreen() {
         }
       }
 
-      // Announcements
       if (announcementsRes.status === "fulfilled") {
         const list: Announcement[] = announcementsRes.value.data.data || [];
         list.sort(
@@ -453,6 +447,52 @@ export default function DashboardScreen() {
     }
   }, [scheduleReminder, isSuperAdmin]);
 
+  // ── Lighter refresh used right after a clock action ──
+  // Updates only attendanceRate / todaysShiftCount — deliberately does NOT
+  // touch `clockedIn`, since that was already set directly from the
+  // clockIn/clockOut API response itself (the actual source of truth).
+  const refreshStatsOnly = useCallback(async () => {
+    if (isSuperAdmin) return;
+    try {
+      const [attendanceRes, shiftsRes] = await Promise.allSettled([
+        Staff.getMyAttendance(),
+        Staff.getMyShifts(),
+      ]);
+
+      const records: AttendanceRecord[] =
+        attendanceRes.status === "fulfilled"
+          ? attendanceRes.value.data.data || []
+          : [];
+      const shifts: Shift[] =
+        shiftsRes.status === "fulfilled" ? shiftsRes.value.data.data || [] : [];
+
+      const today = new Date();
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const todayShifts = shifts.filter((s) =>
+        isSameDay(new Date(s.date), today),
+      );
+      setTodaysShiftCount(todayShifts.length);
+
+      const pastShifts = shifts.filter((s) => new Date(s.date) < startOfToday);
+      if (pastShifts.length > 0) {
+        const covered = pastShifts.filter((s) =>
+          records.some(
+            (r) =>
+              isSameDay(new Date(r.shift.date), new Date(s.date)) &&
+              r.status !== "ABSENT",
+          ),
+        ).length;
+        setAttendanceRate(
+          `${Math.round((covered / pastShifts.length) * 100)}%`,
+        );
+      }
+    } catch (err) {
+      console.log("Stats refresh error:", err);
+    }
+  }, [isSuperAdmin]);
+
   useEffect(() => {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -471,11 +511,13 @@ export default function DashboardScreen() {
     loadDashboard();
   };
 
+  // ── Clock in/out — now trusts the mutation response directly ──
   const handleClockToggle = async () => {
     setClockingIn(true);
     try {
       if (clockedIn) {
-        await Staff.clockOut();
+        const res = await Staff.clockOut();
+        // clockOut succeeded → we are now definitely clocked out
         setClockedIn(false);
       } else {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -487,10 +529,16 @@ export default function DashboardScreen() {
           return;
         }
         const loc = await Location.getCurrentPositionAsync({});
-        await Staff.clockIn(loc.coords.latitude, loc.coords.longitude);
+        const res = await Staff.clockIn(
+          loc.coords.latitude,
+          loc.coords.longitude,
+        );
+        // clockIn succeeded → we are now definitely clocked in,
+        // regardless of what a stale list-reload might say
         setClockedIn(true);
       }
-      loadDashboard();
+      // refresh secondary stats only — clockedIn is already correct above
+      refreshStatsOnly();
     } catch (err: any) {
       Alert.alert(
         "Error",
@@ -686,6 +734,20 @@ export default function DashboardScreen() {
                   accentColor="#7C3AED"
                   accentBg="#EDE9FE"
                 />
+                <SquareQuickAction
+                  icon={<UsersIcon size={20} color="#0F766E" />}
+                  label="Manage Staff"
+                  onPress={() => router.push("/(app)/settings/staff")}
+                  accentColor="#0F766E"
+                  accentBg="#CCFBF1"
+                />
+                <SquareQuickAction
+                  icon={<MessageSquare size={20} color="#DC2626" />}
+                  label="View Feedback"
+                  onPress={() => router.push("/(app)/settings/feedback")}
+                  accentColor="#DC2626"
+                  accentBg="#FEE2E2"
+                />
               </View>
             </ScrollView>
           </View>
@@ -709,7 +771,6 @@ export default function DashboardScreen() {
                 elevation: 2,
               }}
             >
-              {/* department picker */}
               <View className="flex-row items-center mb-3">
                 <Building2 size={15} color="#006B3C" />
                 <Text className="text-gray-900 font-semibold ml-2 text-sm">
@@ -748,7 +809,6 @@ export default function DashboardScreen() {
                 </ScrollView>
               )}
 
-              {/* records */}
               {!selectedDeptId ? (
                 <Text className="text-gray-400 text-sm text-center py-4">
                   Select a department to view logs
@@ -894,7 +954,6 @@ export default function DashboardScreen() {
                 accentBg="#D1FAE5"
               />
 
-              {/* ── DEPT_HEAD-only actions — visible to STAFF too, but locked ── */}
               <QuickAction
                 icon={<Settings2 size={18} color="#DB2777" />}
                 label="Generate Schedule"
@@ -911,6 +970,15 @@ export default function DashboardScreen() {
                 accentBg="#CFFAFE"
                 locked={!isDeptHead}
               />
+              {user?.position === "DOCTOR" && (
+                <QuickAction
+                  icon={<Calendar size={18} color="#DB2777" />}
+                  label="My Appointments"
+                  onPress={() => router.push("/(app)/appointments")}
+                  accentColor="#DB2777"
+                  accentBg="#FCE7F3"
+                />
+              )}
             </View>
           </View>
         )}

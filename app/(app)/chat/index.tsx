@@ -181,12 +181,33 @@ export default function ChatListScreen() {
     }
   };
 
+  const openGroupChat = async () => {
+    try {
+      const res = await Staff.getMyGroupChat();
+      setPickerOpen(false);
+      router.push({
+        pathname: "/(app)/chat/[id]",
+        params: {
+          id: res.data.data.id,
+          contactName: "Department Group",
+          isGroup: "1",
+        },
+      });
+    } catch (err) {
+      console.log("Group chat error:", err);
+    }
+  };
+
   const getOtherMember = (conv: Conversation) =>
     conv.members.find((m) => m.userId !== user?.id)?.user;
 
   const filteredStaff = staffList.filter((s) =>
     `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()),
   );
+
+  // ── Split into two clearly separated sections instead of one mixed list ──
+  const groupConversations = conversations.filter((c) => c.type === "GROUP");
+  const directConversations = conversations.filter((c) => c.type === "DIRECT");
 
   if (loading) {
     return (
@@ -195,6 +216,43 @@ export default function ChatListScreen() {
       </SafeAreaView>
     );
   }
+
+  const renderDirectRow = (conv: Conversation) => {
+    const other = getOtherMember(conv);
+    const last = conv.messages[0];
+    const displayName =
+      `${other?.firstName || "Unknown"} ${other?.lastName || ""}`.trim();
+
+    return (
+      <TouchableOpacity
+        key={conv.id}
+        onPress={() =>
+          router.push({
+            pathname: "/(app)/chat/[id]",
+            params: {
+              id: conv.id,
+              contactName: displayName,
+              contactPhoto: other?.profile?.photoUrl || "",
+              contactStatus: other?.isActive ? "Active now" : "Away",
+              isGroup: "0",
+            },
+          })
+        }
+        activeOpacity={0.85}
+        className="bg-white rounded-2xl p-4 border border-gray-100 mb-2 flex-row items-center"
+      >
+        <Avatar photoUrl={other?.profile?.photoUrl} name={displayName} />
+        <View className="flex-1 ml-3">
+          <Text className="text-gray-900 font-semibold" numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text className="text-gray-400 text-sm mt-0.5" numberOfLines={1}>
+            {last ? last.content : "No messages yet"}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
@@ -228,24 +286,33 @@ export default function ChatListScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        {/* ── Department Group section ── */}
         <View className="mx-6 mt-6">
-          {conversations.length === 0 ? (
-            <View className="items-center py-16 bg-white rounded-2xl border border-gray-100">
-              <MessageCircle size={32} color="#D1D5DB" />
-              <Text className="text-gray-400 text-sm mt-3">
-                No conversations yet
-              </Text>
-            </View>
+          <Text className="text-gray-700 text-[13px] font-semibold mb-2.5">
+            Department
+          </Text>
+          {groupConversations.length === 0 ? (
+            <TouchableOpacity
+              onPress={openGroupChat}
+              activeOpacity={0.85}
+              className="bg-white rounded-2xl p-4 border border-gray-100 flex-row items-center"
+            >
+              <Avatar photoUrl={null} name="Department" isGroup />
+              <View className="flex-1 ml-3">
+                <Text className="text-gray-900 font-semibold">
+                  Department Group
+                </Text>
+                <Text className="text-gray-400 text-sm mt-0.5">
+                  Tap to open your team chat
+                </Text>
+              </View>
+            </TouchableOpacity>
           ) : (
-            conversations.map((conv) => {
-              const other = getOtherMember(conv);
+            groupConversations.map((conv) => {
               const last = conv.messages[0];
-              const isGroup = conv.type === "GROUP";
-              const displayName = isGroup
-                ? conv.department?.name
-                  ? `${conv.department.name} Team`
-                  : "Group Chat"
-                : `${other?.firstName || "Unknown"} ${other?.lastName || ""}`.trim();
+              const displayName = conv.department?.name
+                ? `${conv.department.name} Team`
+                : "Department Group";
 
               return (
                 <TouchableOpacity
@@ -256,42 +323,22 @@ export default function ChatListScreen() {
                       params: {
                         id: conv.id,
                         contactName: displayName,
-                        contactPhoto: isGroup
-                          ? ""
-                          : other?.profile?.photoUrl || "",
-                        contactStatus: isGroup
-                          ? `${conv.members.length} members`
-                          : other?.isActive
-                            ? "Active now"
-                            : "Away",
-                        isGroup: isGroup ? "1" : "0",
+                        contactStatus: `${conv.members.length} members`,
+                        isGroup: "1",
                       },
                     })
                   }
                   activeOpacity={0.85}
-                  className="bg-white rounded-2xl p-4 border border-gray-100 mb-2 flex-row items-center"
+                  className="bg-white rounded-2xl p-4 border border-gray-100 flex-row items-center"
                 >
-                  <Avatar
-                    photoUrl={isGroup ? null : other?.profile?.photoUrl}
-                    name={displayName}
-                    isGroup={isGroup}
-                  />
+                  <Avatar photoUrl={null} name={displayName} isGroup />
                   <View className="flex-1 ml-3">
-                    <View className="flex-row items-center">
-                      <Text
-                        className="text-gray-900 font-semibold"
-                        numberOfLines={1}
-                      >
-                        {displayName}
-                      </Text>
-                      {isGroup && (
-                        <View className="ml-2 bg-emerald-50 px-2 py-0.5 rounded-full">
-                          <Text className="text-emerald-600 text-[10px] font-semibold">
-                            Group
-                          </Text>
-                        </View>
-                      )}
-                    </View>
+                    <Text
+                      className="text-gray-900 font-semibold"
+                      numberOfLines={1}
+                    >
+                      {displayName}
+                    </Text>
                     <Text
                       className="text-gray-400 text-sm mt-0.5"
                       numberOfLines={1}
@@ -302,6 +349,23 @@ export default function ChatListScreen() {
                 </TouchableOpacity>
               );
             })
+          )}
+        </View>
+
+        {/* ── Direct Messages section ── */}
+        <View className="mx-6 mt-6">
+          <Text className="text-gray-700 text-[13px] font-semibold mb-2.5">
+            Direct Messages
+          </Text>
+          {directConversations.length === 0 ? (
+            <View className="items-center py-12 bg-white rounded-2xl border border-gray-100">
+              <MessageCircle size={28} color="#D1D5DB" />
+              <Text className="text-gray-400 text-sm mt-3">
+                No direct messages yet
+              </Text>
+            </View>
+          ) : (
+            directConversations.map(renderDirectRow)
           )}
         </View>
       </ScrollView>

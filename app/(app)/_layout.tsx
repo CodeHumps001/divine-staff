@@ -177,6 +177,9 @@ export default function AppTabsLayout() {
         options={{ href: null, tabBarStyle: { display: "none" } }}
       />
       <Tabs.Screen name="settings/hospital" options={{ href: null }} />
+      <Tabs.Screen name="settings/staff" options={{ href: null }} />
+      <Tabs.Screen name="appointments" options={{ href: null }} />
+      <Tabs.Screen name="settings/feedback" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -24,6 +24,15 @@ export const Auth = {
     publicApi.post("/auth/login", { email, password }),
   changePassword: (currentPassword: string, newPassword: string) =>
     privateApi.patch("/auth/change-password", { currentPassword, newPassword }),
+  register: (data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    role: string;
+    position: string;
+    departmentId?: string;
+  }) => privateApi.post("/auth/register", data),
 };
 
 export const Staff = {
@@ -90,6 +99,17 @@ export const Staff = {
     email?: string;
     logoUrl?: string;
   }) => privateApi.put("/settings", data),
+
+  getAllStaff: () => privateApi.get("/users"),
+  deactivateStaff: (id: string) => privateApi.patch(`/users/${id}/deactivate`),
+  getMyGroupChat: () => privateApi.get("/chat/my-group"),
+  getMyAppointments: () => privateApi.get("/appointments/doctor"),
+  updateAppointmentStatus: (
+    id: string,
+    status: "CONFIRMED" | "COMPLETED" | "CANCELLED",
+  ) => privateApi.patch(`/appointments/${id}/status`, { status }),
+  syncGroupChats: () => privateApi.post("/chat/sync-groups"),
+  getAllFeedback: () => privateApi.get("/feedback"),
 };
 
 export const Users = {

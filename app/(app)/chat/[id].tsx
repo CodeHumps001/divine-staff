@@ -382,9 +382,9 @@ export default function ChatThreadScreen() {
         <View className="absolute inset-0 bg-white/80" />
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           className="flex-1"
-          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 120 : 0}
         >
           <FlatList
             ref={listRef}

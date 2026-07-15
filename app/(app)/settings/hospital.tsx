@@ -160,17 +160,44 @@ export default function HospitalSettingsScreen() {
         style={{ paddingTop: insets.top + 12 }}
         className="mx-4 rounded-[28px] px-4 py-4"
       >
-        <View className="flex-row items-center p-5">
+        <View className="flex-row items-center p-5 justify-between">
           <TouchableOpacity
             onPress={() => router.back()}
             className="w-10 h-10 rounded-full items-center justify-center bg-white/15"
           >
             <ArrowLeft size={20} color="#ffffff" />
           </TouchableOpacity>
-          <View className="flex-1 items-center pr-10">
+
+          <View className="flex-1 items-center ">
             <Text className="text-white text-base font-semibold">
               Hospital Settings
             </Text>
+          </View>
+          <View
+            className=" p-2
+        "
+          >
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await Staff.syncGroupChats();
+                  Alert.alert(
+                    "Done",
+                    "All department group chats have been synced.",
+                  );
+                } catch (err: any) {
+                  Alert.alert(
+                    "Error",
+                    err.response?.data?.message || "Sync failed",
+                  );
+                }
+              }}
+              className=" bg-gray-100 rounded-xl py-3 items-center"
+            >
+              <Text className="text-gray-700 text-sm font-medium p-1">
+                Sync Group Chats
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </LinearGradient>
