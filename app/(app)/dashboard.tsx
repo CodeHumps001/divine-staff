@@ -1,7 +1,6 @@
 // app/(app)/dashboard.tsx
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
-import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import {
   Bell,
@@ -21,7 +20,7 @@ import {
   Users,
   UsersIcon,
 } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -138,7 +137,7 @@ function InsightCard({
   );
 }
 
-// ─── Quick Action (now supports a locked/disabled state) ───────
+// ─── Quick Action ──────────────────────────────────────────────
 function QuickAction({
   icon,
   label,
@@ -271,8 +270,6 @@ export default function DashboardScreen() {
   const [unreadDot, setUnreadDot] = useState(false);
   const [todaysShiftCount, setTodaysShiftCount] = useState(0);
   const [approvalRate, setApprovalRate] = useState<string | null>(null);
-  const lastAnnouncementId = useRef<string | null>(null);
-  const lastShiftId = useRef<string | null>(null);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
@@ -304,23 +301,13 @@ export default function DashboardScreen() {
       .finally(() => setLoadingAttendance(false));
   }, [isSuperAdmin, selectedDeptId]);
 
-  const scheduleReminder = useCallback(async (title: string, body: string) => {
-    const settings = await Notifications.requestPermissionsAsync();
-    if (settings.status !== "granted") return;
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        sound: true,
-        data: { screen: "/(app)/dashboard" },
-      },
-      trigger: null,
-    });
-  }, []);
-
-  // ── Full dashboard load — used on mount, pull-to-refresh, and manual refresh ──
-  // This is the ONLY place that derives `clockedIn` from the attendance list.
+  // ── Full dashboard load. Note: no local notification scheduling here —
+  // announcements, shift reminders, leave, chat, and attendance now all
+  // arrive as real server-sent push notifications instead. Duplicating
+  // that with a local scheduleNotificationAsync call here caused a
+  // notification to fire every single time the app opened and the
+  // dashboard loaded, since there was nothing persisting "already seen"
+  // state across app restarts. ──
   const loadDashboard = useCallback(async () => {
     try {
       if (isSuperAdmin) {
@@ -402,20 +389,7 @@ export default function DashboardScreen() {
         .sort(
           (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
         );
-      const nextShift = upcoming[0] || null;
-      setUpcomingShift(nextShift);
-
-      if (nextShift && lastShiftId.current !== nextShift.id) {
-        const shiftDate = new Date(nextShift.date);
-        const isSoon = shiftDate.getTime() - Date.now() <= 24 * 60 * 60 * 1000;
-        if (isSoon) {
-          lastShiftId.current = nextShift.id;
-          void scheduleReminder(
-            "Shift reminder",
-            `${nextShift.shiftType.name} starts at ${nextShift.shiftType.startTime}`,
-          );
-        }
-      }
+      setUpcomingShift(upcoming[0] || null);
 
       if (announcementsRes.status === "fulfilled") {
         const list: Announcement[] = announcementsRes.value.data.data || [];
@@ -429,14 +403,6 @@ export default function DashboardScreen() {
           const hrsAgo =
             (Date.now() - new Date(latest.createdAt).getTime()) / 36e5;
           setUnreadDot(hrsAgo < 24);
-          if (lastAnnouncementId.current !== latest.id) {
-            lastAnnouncementId.current = latest.id;
-            const notificationBody =
-              latest.title.length > 80
-                ? `${latest.title.slice(0, 77)}...`
-                : latest.title;
-            void scheduleReminder("New announcement", notificationBody);
-          }
         }
       }
     } catch (err) {
@@ -445,64 +411,9 @@ export default function DashboardScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [scheduleReminder, isSuperAdmin]);
-
-  // ── Lighter refresh used right after a clock action ──
-  // Updates only attendanceRate / todaysShiftCount — deliberately does NOT
-  // touch `clockedIn`, since that was already set directly from the
-  // clockIn/clockOut API response itself (the actual source of truth).
-  const refreshStatsOnly = useCallback(async () => {
-    if (isSuperAdmin) return;
-    try {
-      const [attendanceRes, shiftsRes] = await Promise.allSettled([
-        Staff.getMyAttendance(),
-        Staff.getMyShifts(),
-      ]);
-
-      const records: AttendanceRecord[] =
-        attendanceRes.status === "fulfilled"
-          ? attendanceRes.value.data.data || []
-          : [];
-      const shifts: Shift[] =
-        shiftsRes.status === "fulfilled" ? shiftsRes.value.data.data || [] : [];
-
-      const today = new Date();
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-
-      const todayShifts = shifts.filter((s) =>
-        isSameDay(new Date(s.date), today),
-      );
-      setTodaysShiftCount(todayShifts.length);
-
-      const pastShifts = shifts.filter((s) => new Date(s.date) < startOfToday);
-      if (pastShifts.length > 0) {
-        const covered = pastShifts.filter((s) =>
-          records.some(
-            (r) =>
-              isSameDay(new Date(r.shift.date), new Date(s.date)) &&
-              r.status !== "ABSENT",
-          ),
-        ).length;
-        setAttendanceRate(
-          `${Math.round((covered / pastShifts.length) * 100)}%`,
-        );
-      }
-    } catch (err) {
-      console.log("Stats refresh error:", err);
-    }
   }, [isSuperAdmin]);
 
   useEffect(() => {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
-    });
     loadDashboard();
   }, [loadDashboard]);
 
@@ -511,13 +422,11 @@ export default function DashboardScreen() {
     loadDashboard();
   };
 
-  // ── Clock in/out — now trusts the mutation response directly ──
   const handleClockToggle = async () => {
     setClockingIn(true);
     try {
       if (clockedIn) {
-        const res = await Staff.clockOut();
-        // clockOut succeeded → we are now definitely clocked out
+        await Staff.clockOut();
         setClockedIn(false);
       } else {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -529,16 +438,10 @@ export default function DashboardScreen() {
           return;
         }
         const loc = await Location.getCurrentPositionAsync({});
-        const res = await Staff.clockIn(
-          loc.coords.latitude,
-          loc.coords.longitude,
-        );
-        // clockIn succeeded → we are now definitely clocked in,
-        // regardless of what a stale list-reload might say
+        await Staff.clockIn(loc.coords.latitude, loc.coords.longitude);
         setClockedIn(true);
       }
-      // refresh secondary stats only — clockedIn is already correct above
-      refreshStatsOnly();
+      loadDashboard();
     } catch (err: any) {
       Alert.alert(
         "Error",
@@ -619,7 +522,7 @@ export default function DashboardScreen() {
             </View>
           </LinearGradient>
         </View>
-        {/* ─── CLOCK IN CARD — hidden for SUPER_ADMIN (no personal shifts) ── */}
+        {/* ─── CLOCK IN CARD ────────────────────────────────────── */}
         {!isSuperAdmin && (
           <View className="mx-4 mt-4">
             <View
@@ -694,7 +597,7 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* ─── ADMIN QUICK ACTIONS — SUPER_ADMIN only, swipeable square cards ── */}
+        {/* ─── ADMIN QUICK ACTIONS ────────────────────────────────── */}
         {isSuperAdmin && (
           <View className="mx-4 mt-5">
             <Text className="text-gray-700 text-[13px] font-semibold mb-2.5">
@@ -752,7 +655,7 @@ export default function DashboardScreen() {
             </ScrollView>
           </View>
         )}
-        {/* ─── ATTENDANCE LOGS — SUPER_ADMIN only ────────────────── */}
+        {/* ─── ATTENDANCE LOGS ────────────────────────────────────── */}
         {isSuperAdmin && (
           <View className="mx-4 mt-5">
             <View className="flex-row items-center justify-between mb-2.5">
@@ -868,7 +771,7 @@ export default function DashboardScreen() {
             </View>
           </View>
         )}
-        {/* ─── INSIGHTS CAROUSEL — hidden for SUPER_ADMIN ────────── */}
+        {/* ─── INSIGHTS CAROUSEL ───────────────────────────────── */}
         {!isSuperAdmin && (
           <View className="mx-4 mt-4">
             <View className="flex-row items-center justify-between mb-2">
@@ -918,7 +821,7 @@ export default function DashboardScreen() {
             </ScrollView>
           </View>
         )}
-        {/* ─── QUICK ACTIONS — hidden entirely for SUPER_ADMIN ───── */}
+        {/* ─── QUICK ACTIONS ────────────────────────────────────── */}
         {!isSuperAdmin && (
           <View className="mx-4 mt-5">
             <Text className="text-gray-700 text-[13px] font-semibold mb-2.5">
@@ -982,7 +885,7 @@ export default function DashboardScreen() {
             </View>
           </View>
         )}
-        {/* ─── UPCOMING SHIFT — hidden for SUPER_ADMIN ───────────── */}
+        {/* ─── UPCOMING SHIFT ────────────────────────────────────── */}
         {!isSuperAdmin && (
           <View className="mx-4 mt-5">
             <View className="flex-row items-center justify-between mb-2.5">
@@ -1060,7 +963,7 @@ export default function DashboardScreen() {
             </View>
           </View>
         )}
-        {/* ─── LATEST ANNOUNCEMENT — visible to everyone, incl. SUPER_ADMIN ── */}
+        {/* ─── LATEST ANNOUNCEMENT ──────────────────────────────── */}
         {latestAnnouncement && (
           <TouchableOpacity
             onPress={() => router.push("/(app)/announcements")}

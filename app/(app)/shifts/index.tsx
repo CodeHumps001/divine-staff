@@ -7,9 +7,11 @@ import { useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import {
   ArrowLeft,
+  ArrowLeftRight,
   ChevronLeft,
   ChevronRight,
   Download,
+  Notebook,
   Settings2,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -211,7 +213,7 @@ export default function ShiftsScreen() {
               My Shifts
             </Text>
           </View>
-          <View className="flex-row items-center absolute right-5">
+          <View className="flex-row items-center gap-2   right-5">
             {canManageShifts && (
               <TouchableOpacity
                 onPress={() => router.push("/(app)/shifts/generate")}
@@ -231,6 +233,20 @@ export default function ShiftsScreen() {
                 <Download size={18} color="#ffffff" />
               )}
             </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/(app)/shifts/swap")}
+              className="w-10 h-10 rounded-full items-center justify-center bg-white/15 mr-2"
+            >
+              <ArrowLeftRight size={18} color="#ffffff" />
+            </TouchableOpacity>
+            {(user?.role === "DEPT_HEAD" || user?.role === "SUPER_ADMIN") && (
+              <TouchableOpacity
+                onPress={() => router.push("/(app)/shifts/swap-review")}
+                className="w-10 h-10 rounded-full items-center justify-center bg-white/15 mr-2"
+              >
+                <Notebook size={18} color="#ffffff" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </LinearGradient>

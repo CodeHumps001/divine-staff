@@ -1,5 +1,5 @@
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+import { storage } from "./storage";
 
 const API_URL = "https://devine-care-backend.onrender.com/api/v1";
 
@@ -14,7 +14,7 @@ export const privateApi = axios.create({
 });
 
 privateApi.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync("lifecare_token");
+  const token = await storage.getItem("lifecare_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -110,6 +110,20 @@ export const Staff = {
   ) => privateApi.patch(`/appointments/${id}/status`, { status }),
   syncGroupChats: () => privateApi.post("/chat/sync-groups"),
   getAllFeedback: () => privateApi.get("/feedback"),
+
+  getMySwapRequests: () => privateApi.get("/shifts/swap-requests/my"),
+  getDepartmentSwapRequests: (departmentId?: string) =>
+    privateApi.get("/shifts/swap-requests/department", {
+      params: departmentId ? { departmentId } : {},
+    }),
+  getColleagueShifts: () => privateApi.get("/shifts/colleagues"),
+  requestSwap: (data: {
+    targetStaffId: string;
+    originalShiftId: string;
+    targetShiftId: string;
+  }) => privateApi.post("/shifts/swap-request", data),
+  reviewSwapRequest: (id: string, status: "APPROVED" | "REJECTED") =>
+    privateApi.patch(`/shifts/swap-request/${id}`, { status }),
 };
 
 export const Users = {

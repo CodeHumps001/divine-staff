@@ -1,4 +1,3 @@
-// app/(app)/chat/[id].tsx
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -65,11 +64,13 @@ function MessageBubble({
   isMine,
   isGrouped,
   showSenderName,
+  isRead,
 }: {
   message: Message;
   isMine: boolean;
   isGrouped: boolean;
   showSenderName: boolean;
+  isRead: boolean;
 }) {
   const [showTime, setShowTime] = useState(false);
 
@@ -111,7 +112,11 @@ function MessageBubble({
           </Text>
           {isMine && (
             <View className="ml-1">
-              <CheckCheck size={12} color="#ffffff" />
+              {isRead ? (
+                <CheckCheck size={12} color="#38BDF8" />
+              ) : (
+                <CheckCheck size={12} color="#ffffff" />
+              )}
             </View>
           )}
         </View>
@@ -140,8 +145,10 @@ export default function ChatThreadScreen() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
 
-  // ── Track which users are typing, by id → name (supports multiple in a group) ──
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
+  // ── Read receipts: any of my messages sent at/before this timestamp
+  // have been read by the other party ──
+  const [readUpTo, setReadUpTo] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -167,22 +174,31 @@ export default function ChatThreadScreen() {
       const socket = await getSocket();
       socketRef = socket;
       socket.emit("join_conversation", id);
+      // mark everything currently unread as read the moment we open the thread
+      socket.emit("mark_read", id);
 
       socket.on("new_message", (msg: Message) => {
         setMessages((prev) => [...prev, msg]);
-        // clear typing indicator for whoever just sent a message
         setTypingUsers((prev) => {
           const next = { ...prev };
           delete next[msg.senderId];
           return next;
         });
+        // we're actively viewing — mark this new message read immediately too
+        socket.emit("mark_read", id);
       });
 
-      // ── Fixed: backend emits "user_typing" with { userId }, not "typing" ──
-      socket.on("user_typing", ({ userId }: { userId: string }) => {
-        if (userId === user?.id) return; // ignore our own typing echo
+      socket.on(
+        "messages_read",
+        ({ userId }: { userId: string; readAt: string }) => {
+          if (userId === user?.id) return; // ignore our own read receipt echo
+          setReadUpTo(new Date().toISOString());
+        },
+      );
 
-        // find the sender's name from recent messages, fallback to generic label
+      socket.on("user_typing", ({ userId }: { userId: string }) => {
+        if (userId === user?.id) return;
+
         const knownSender = messages.find((m) => m.senderId === userId)?.sender;
         const name = knownSender
           ? knownSender.firstName
@@ -215,6 +231,7 @@ export default function ChatThreadScreen() {
         socketRef.emit("leave_conversation", id);
         socketRef.off("new_message");
         socketRef.off("user_typing");
+        socketRef.off("messages_read");
         socketRef.off("error");
       }
       Object.values(typingTimeouts).forEach(clearTimeout);
@@ -382,7 +399,7 @@ export default function ChatThreadScreen() {
         <View className="absolute inset-0 bg-white/80" />
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           className="flex-1"
           keyboardVerticalOffset={Platform.OS === "ios" ? 120 : 0}
         >
@@ -412,6 +429,10 @@ export default function ChatThreadScreen() {
                   const isMine = msg.senderId === user?.id;
                   const prev = item.messages[index - 1];
                   const grouped = prev && prev.senderId === msg.senderId;
+                  const isRead =
+                    isMine &&
+                    readUpTo !== null &&
+                    new Date(msg.createdAt) <= new Date(readUpTo);
                   return (
                     <MessageBubble
                       key={msg.id}
@@ -419,6 +440,7 @@ export default function ChatThreadScreen() {
                       isMine={isMine}
                       isGrouped={grouped}
                       showSenderName={isGroup}
+                      isRead={isRead}
                     />
                   );
                 })}

@@ -180,6 +180,8 @@ export default function AppTabsLayout() {
       <Tabs.Screen name="settings/staff" options={{ href: null }} />
       <Tabs.Screen name="appointments" options={{ href: null }} />
       <Tabs.Screen name="settings/feedback" options={{ href: null }} />
+      <Tabs.Screen name="shifts/swap" options={{ href: null }} />
+      <Tabs.Screen name="shifts/swap-review" options={{ href: null }} />
     </Tabs>
   );
 }

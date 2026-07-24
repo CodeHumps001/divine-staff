@@ -1,5 +1,5 @@
-import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
+import { storage } from "./storage";
 
 interface AuthStore {
   user: any | null;
@@ -16,20 +16,20 @@ export const useAuthStore = create<AuthStore>((set) => ({
   isAuthenticated: false,
 
   login: async (user, token) => {
-    await SecureStore.setItemAsync("lifecare_token", token);
-    await SecureStore.setItemAsync("lifecare_user", JSON.stringify(user));
+    await storage.setItem("lifecare_token", token);
+    await storage.setItem("lifecare_user", JSON.stringify(user));
     set({ user, token, isAuthenticated: true });
   },
 
   logout: async () => {
-    await SecureStore.deleteItemAsync("lifecare_token");
-    await SecureStore.deleteItemAsync("lifecare_user");
+    await storage.deleteItem("lifecare_token");
+    await storage.deleteItem("lifecare_user");
     set({ user: null, token: null, isAuthenticated: false });
   },
 
   hydrate: async () => {
-    const token = await SecureStore.getItemAsync("lifecare_token");
-    const userStr = await SecureStore.getItemAsync("lifecare_user");
+    const token = await storage.getItem("lifecare_token");
+    const userStr = await storage.getItem("lifecare_user");
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr);
