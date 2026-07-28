@@ -14,8 +14,7 @@ import {
 } from "lucide-react-native";
 import { useEffect } from "react";
 import { Platform, Text, View } from "react-native";
-// app/(app)/_layout.tsx — update the useEffect
-// app/(app)/_layout.tsx — update the useEffect
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const ACTIVE_COLOR = "#0F766E";
 const INACTIVE_COLOR = "#94A3B8";
@@ -56,12 +55,19 @@ function TabIcon({
 }
 
 export default function AppTabsLayout() {
-  // inside AppTabsLayout:
+  const insets = useSafeAreaInsets();
+
   useEffect(() => {
     registerForPushNotifications();
     const subscription = setupNotificationResponseListener();
     return () => subscription.remove();
   }, []);
+
+  // Distance from the bottom of the screen, accounting for Android's
+  // edge-to-edge gesture bar (or iOS home indicator) instead of a fixed
+  // guess. Falls back to 16 on devices reporting a 0 inset (older Android
+  // 3-button nav) so the bar isn't glued to the very edge.
+  const tabBarBottom = Math.max(insets.bottom, 16);
 
   return (
     <Tabs
@@ -73,7 +79,7 @@ export default function AppTabsLayout() {
           position: "absolute",
           left: 20,
           right: 20,
-          bottom: 16,
+          bottom: tabBarBottom,
           maxWidth: 420,
           width: "100%",
           alignSelf: "center",

@@ -13,7 +13,9 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   Text,
@@ -316,69 +318,76 @@ export default function DepartmentLeaveScreen() {
         transparent
         onRequestClose={() => setReviewTarget(null)}
       >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View className="bg-white rounded-t-[28px] px-5 pt-5 pb-8">
-            <View className="flex-row items-center justify-between mb-5">
-              <Text className="text-gray-900 text-lg font-bold">
-                Review Leave
-              </Text>
-              <TouchableOpacity onPress={() => setReviewTarget(null)}>
-                <X size={22} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-
-            <Text className="text-gray-500 text-sm mb-1">
-              {reviewTarget?.user.firstName} {reviewTarget?.user.lastName}
-            </Text>
-            <Text className="text-gray-900 font-medium mb-4">
-              {reviewTarget && new Date(reviewTarget.startDate).toDateString()}{" "}
-              → {reviewTarget && new Date(reviewTarget.endDate).toDateString()}
-            </Text>
-
-            <Text className="text-gray-700 text-sm font-medium mb-1.5">
-              Note (optional)
-            </Text>
-            <TextInput
-              value={reviewNote}
-              onChangeText={setReviewNote}
-              placeholder="Add a note for the staff member..."
-              placeholderTextColor="#9CA3AF"
-              multiline
-              numberOfLines={3}
-              className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-5"
-              style={{ textAlignVertical: "top", minHeight: 90 }}
-            />
-
-            <View className="flex-row gap-3">
-              <TouchableOpacity
-                onPress={() => handleReview("REJECTED")}
-                disabled={reviewing}
-                className="flex-1 bg-red-50 rounded-xl py-4 items-center justify-center flex-row"
-              >
-                <X size={16} color="#DC2626" />
-                <Text className="text-red-600 font-semibold ml-1.5">
-                  Reject
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1"
+        >
+          <View className="flex-1 bg-black/40 justify-end">
+            <View className="bg-white rounded-t-[28px] px-5 pt-5 pb-8">
+              <View className="flex-row items-center justify-between mb-5">
+                <Text className="text-gray-900 text-lg font-bold">
+                  Review Leave
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleReview("APPROVED")}
-                disabled={reviewing}
-                className="flex-1 bg-[#006B3C] rounded-xl py-4 items-center justify-center flex-row"
-              >
-                {reviewing ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <>
-                    <Check size={16} color="#ffffff" />
-                    <Text className="text-white font-semibold ml-1.5">
-                      Approve
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity onPress={() => setReviewTarget(null)}>
+                  <X size={22} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <Text className="text-gray-500 text-sm mb-1">
+                {reviewTarget?.user.firstName} {reviewTarget?.user.lastName}
+              </Text>
+              <Text className="text-gray-900 font-medium mb-4">
+                {reviewTarget &&
+                  new Date(reviewTarget.startDate).toDateString()}{" "}
+                →{" "}
+                {reviewTarget && new Date(reviewTarget.endDate).toDateString()}
+              </Text>
+
+              <Text className="text-gray-700 text-sm font-medium mb-1.5">
+                Note (optional)
+              </Text>
+              <TextInput
+                value={reviewNote}
+                onChangeText={setReviewNote}
+                placeholder="Add a note for the staff member..."
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={3}
+                className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-5"
+                style={{ textAlignVertical: "top", minHeight: 90 }}
+              />
+
+              <View className="flex-row gap-3">
+                <TouchableOpacity
+                  onPress={() => handleReview("REJECTED")}
+                  disabled={reviewing}
+                  className="flex-1 bg-red-50 rounded-xl py-4 items-center justify-center flex-row"
+                >
+                  <X size={16} color="#DC2626" />
+                  <Text className="text-red-600 font-semibold ml-1.5">
+                    Reject
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleReview("APPROVED")}
+                  disabled={reviewing}
+                  className="flex-1 bg-[#006B3C] rounded-xl py-4 items-center justify-center flex-row"
+                >
+                  {reviewing ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <>
+                      <Check size={16} color="#ffffff" />
+                      <Text className="text-white font-semibold ml-1.5">
+                        Approve
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

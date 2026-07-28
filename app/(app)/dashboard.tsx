@@ -87,7 +87,7 @@ function InsightCard({
 }) {
   return (
     <View
-      className="w-[220px] rounded-[20px] overflow-hidden border border-white/20"
+      className="w-[220px] rounded-[20px]"
       style={{
         shadowColor: "#0F172A",
         shadowOpacity: 0.12,
@@ -96,43 +96,45 @@ function InsightCard({
         elevation: 4,
       }}
     >
-      <LinearGradient
-        colors={accent}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        className="px-3 py-3"
-      >
-        <View className="flex-row items-start justify-between p-3">
-          <View className="flex-1 pr-3">
-            <Text className="text-white text-[10px] font-semibold  ">
-              {title}
-            </Text>
-            <Text className="text-white text-[35px] font-bold mt-1">
-              {value !== null && value !== undefined ? value : "—"}
-            </Text>
-            <Text className="text-white/70 text-[12px] mt-1">{subtitle}</Text>
-          </View>
-          <View className="px-2 py-0.5 rounded-full bg-white/15">
-            <Text className="text-white text-[10px] font-semibold">
-              {trend}
-            </Text>
-          </View>
-        </View>
-
-        <View className="flex-row items-end h-12 mt-3 gap-1">
-          {bars.map((bar, index) => (
-            <View
-              key={index}
-              className="flex-1 rounded-t-[10px] overflow-hidden bg-white/20 justify-end"
-            >
-              <View
-                className="bg-white/90 rounded-t-[10px]"
-                style={{ height: `${bar}%` }}
-              />
+      <View className="rounded-[20px] overflow-hidden border border-white/20">
+        <LinearGradient
+          colors={accent}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          className="px-3 py-3"
+        >
+          <View className="flex-row items-start justify-between p-3">
+            <View className="flex-1 pr-3">
+              <Text className="text-white text-[10px] font-semibold  ">
+                {title}
+              </Text>
+              <Text className="text-white text-[35px] font-bold mt-1">
+                {value !== null && value !== undefined ? value : "—"}
+              </Text>
+              <Text className="text-white/70 text-[12px] mt-1">{subtitle}</Text>
             </View>
-          ))}
-        </View>
-      </LinearGradient>
+            <View className="px-2 py-0.5 rounded-full bg-white/15">
+              <Text className="text-white text-[10px] font-semibold">
+                {trend}
+              </Text>
+            </View>
+          </View>
+
+          <View className="flex-row items-end h-12 mt-3 gap-1">
+            {bars.map((bar, index) => (
+              <View
+                key={index}
+                className="flex-1 rounded-t-[10px] overflow-hidden bg-white/20 justify-end"
+              >
+                <View
+                  className="bg-white/90 rounded-t-[10px]"
+                  style={{ height: `${bar}%` }}
+                />
+              </View>
+            ))}
+          </View>
+        </LinearGradient>
+      </View>
     </View>
   );
 }
@@ -477,7 +479,10 @@ export default function DashboardScreen() {
         }
       >
         {/* ─── PREMIUM HEADER ─────────────────────────────────── */}
-        <View className="mx-4 mt-14 overflow-hidden rounded-[28px] ">
+        <View
+          className="mx-4 overflow-hidden rounded-[28px]"
+          style={{ marginTop: insets.top + 12 }}
+        >
           <LinearGradient
             colors={["#0F5132", "#146C43", "#1F8B5B"]}
             start={{ x: 0, y: 0 }}

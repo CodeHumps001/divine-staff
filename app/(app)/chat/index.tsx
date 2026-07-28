@@ -11,11 +11,15 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import {
@@ -370,49 +374,78 @@ export default function ChatListScreen() {
         </View>
       </ScrollView>
 
-      {pickerOpen && (
-        <View className="absolute inset-0 bg-black/40 justify-end">
-          <View className="bg-white rounded-t-3xl px-6 pt-6 pb-10 max-h-[80%]">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-gray-900 text-lg font-bold">
-                New Message
-              </Text>
-              <TouchableOpacity onPress={() => setPickerOpen(false)}>
-                <X size={22} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search staff..."
-              placeholderTextColor="#9CA3AF"
-              className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm mb-4"
-            />
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {filteredStaff.map((s) => (
-                <TouchableOpacity
-                  key={s.id}
-                  onPress={() => startChat(s.id)}
-                  disabled={starting}
-                  className="flex-row items-center py-3 border-b border-gray-50"
+      {/* ── "New Message" picker — now a real Modal (was a plain absolutely-
+             positioned View), so Android's hardware back button closes it
+             instead of navigating away from the whole Chat tab, and it's
+             keyboard-safe like the other bottom sheets in the app ── */}
+      <Modal
+        visible={pickerOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPickerOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1"
+        >
+          <TouchableWithoutFeedback onPress={() => setPickerOpen(false)}>
+            <View className="flex-1 bg-black/40 justify-end">
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <View
+                  className="bg-white rounded-t-3xl px-6 pt-6"
+                  style={{
+                    maxHeight: "80%",
+                    paddingBottom: Platform.OS === "ios" ? 34 : 20,
+                  }}
                 >
-                  <Avatar
-                    photoUrl={s.profile?.photoUrl}
-                    name={s.firstName}
-                    size={36}
-                  />
-                  <View className="ml-3">
-                    <Text className="text-gray-900 text-sm font-medium">
-                      {s.firstName} {s.lastName}
+                  <View className="flex-row items-center justify-between mb-4">
+                    <Text className="text-gray-900 text-lg font-bold">
+                      New Message
                     </Text>
-                    <Text className="text-gray-400 text-xs">{s.position}</Text>
+                    <TouchableOpacity onPress={() => setPickerOpen(false)}>
+                      <X size={22} color="#6B7280" />
+                    </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      )}
+                  <TextInput
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholder="Search staff..."
+                    placeholderTextColor="#9CA3AF"
+                    className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm mb-4"
+                  />
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {filteredStaff.map((s) => (
+                      <TouchableOpacity
+                        key={s.id}
+                        onPress={() => startChat(s.id)}
+                        disabled={starting}
+                        className="flex-row items-center py-3 border-b border-gray-50"
+                      >
+                        <Avatar
+                          photoUrl={s.profile?.photoUrl}
+                          name={s.firstName}
+                          size={36}
+                        />
+                        <View className="ml-3">
+                          <Text className="text-gray-900 text-sm font-medium">
+                            {s.firstName} {s.lastName}
+                          </Text>
+                          <Text className="text-gray-400 text-xs">
+                            {s.position}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }

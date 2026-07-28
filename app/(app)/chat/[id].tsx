@@ -11,6 +11,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   ImageBackground,
@@ -373,12 +374,24 @@ export default function ChatThreadScreen() {
           {!isGroup && (
             <View className="flex-row items-center gap-1">
               <TouchableOpacity
+                onPress={() =>
+                  Alert.alert(
+                    "Not available",
+                    "Voice calling isn't set up yet.",
+                  )
+                }
                 className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
                 activeOpacity={0.7}
               >
                 <Phone size={16} color="#ffffff" />
               </TouchableOpacity>
               <TouchableOpacity
+                onPress={() =>
+                  Alert.alert(
+                    "Not available",
+                    "Video calling isn't set up yet.",
+                  )
+                }
                 className="w-8 h-8 rounded-full bg-white/10 items-center justify-center"
                 activeOpacity={0.7}
               >
