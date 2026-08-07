@@ -36,6 +36,7 @@ import {
 } from "react-native-safe-area-context";
 import { Auth, Staff } from "../../lib/api";
 import { useAuthStore } from "../../lib/store";
+import { useTabBarSafeBottomPadding } from "../../lib/useTabBarHeight";
 
 const FEEDBACK_CATEGORIES = [
   { key: "GENERAL", label: "General" },
@@ -124,6 +125,7 @@ export default function ProfileScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPw, setChangingPw] = useState(false);
   const insets = useSafeAreaInsets();
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   // ── Re-sync local form state whenever the logged-in user changes ──
   // (fixes stale/blank fields after logout → login without a full unmount)
@@ -284,7 +286,12 @@ export default function ProfileScreen() {
     null;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F5F7F6]" edges={["bottom"]}>
+    // edges intentionally empty — same reasoning as chat/index.tsx: the
+    // gradient below sets its own `paddingTop: insets.top + 12`, so a
+    // "top" edge here would double that gap. Bottom is handled by
+    // `tabBarSafeBottom` on the ScrollView, so "bottom" isn't needed
+    // either — this screen already owns both edges itself.
+    <SafeAreaView className="flex-1 bg-[#F5F7F6]" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -312,7 +319,7 @@ export default function ProfileScreen() {
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 16,
-          paddingBottom: 36,
+          paddingBottom: tabBarSafeBottom,
         }}
       >
         <View

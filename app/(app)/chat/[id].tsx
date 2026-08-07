@@ -403,18 +403,16 @@ export default function ChatThreadScreen() {
       </LinearGradient>
 
       <ImageBackground
-        source={{
-          uri: "https://images.unsplash.com/photo-1584982751601-97dcc096659c?q=60&w=800&auto=format&fit=crop&blur=60",
-        }}
+        source={require("../../../assets/images/commu.png")} 
         resizeMode="cover"
         className="flex-1"
       >
         <View className="absolute inset-0 bg-white/80" />
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === "ios" ? "padding" : undefined} 
           className="flex-1"
-          keyboardVerticalOffset={Platform.OS === "ios" ? 120 : 0}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 110 : 0}
         >
           <FlatList
             ref={listRef}
@@ -461,13 +459,13 @@ export default function ChatThreadScreen() {
             )}
           />
 
-          {typingLabel && (
+          {typingLabel ? (
             <View className="px-4 pb-2 flex-row items-center">
               <View className="bg-gray-200/80 px-4 py-2 rounded-2xl rounded-tl-sm">
                 <Text className="text-gray-500 text-xs">{typingLabel}</Text>
               </View>
             </View>
-          )}
+          ) : null}
 
           <View className="px-3 py-3 bg-white/95 border-t border-gray-100/80">
             <View className="flex-row items-end gap-2">
@@ -492,9 +490,11 @@ export default function ChatThreadScreen() {
                 onPress={handleSend}
                 disabled={sending || !input.trim()}
                 activeOpacity={0.85}
-                className={`w-11 h-11 rounded-full items-center justify-center ${
-                  input.trim() ? "bg-emerald-600" : "bg-gray-200"
-                }`}
+                className={
+                  input.trim()
+                    ? "w-11 h-11 rounded-full items-center justify-center bg-emerald-600"
+                    : "w-11 h-11 rounded-full items-center justify-center bg-gray-200"
+                }
                 style={{
                   shadowColor: input.trim() ? "#059669" : "transparent",
                   shadowOpacity: input.trim() ? 0.25 : 0,

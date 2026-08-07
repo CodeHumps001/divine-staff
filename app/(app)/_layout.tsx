@@ -3,6 +3,10 @@ import {
   registerForPushNotifications,
   setupNotificationResponseListener,
 } from "@/lib/notifications";
+import {
+  TAB_BAR_HEIGHT,
+  TAB_BAR_MIN_BOTTOM_OFFSET,
+} from "@/lib/useTabBarHeight";
 import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
 import {
@@ -67,7 +71,7 @@ export default function AppTabsLayout() {
   // edge-to-edge gesture bar (or iOS home indicator) instead of a fixed
   // guess. Falls back to 16 on devices reporting a 0 inset (older Android
   // 3-button nav) so the bar isn't glued to the very edge.
-  const tabBarBottom = Math.max(insets.bottom, 16);
+  const tabBarBottom = Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM_OFFSET);
 
   return (
     <Tabs
@@ -83,7 +87,7 @@ export default function AppTabsLayout() {
           maxWidth: 420,
           width: "100%",
           alignSelf: "center",
-          height: 72,
+          height: TAB_BAR_HEIGHT,
           paddingTop: 4,
           paddingBottom: 8,
           paddingHorizontal: 4,

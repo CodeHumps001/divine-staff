@@ -1,4 +1,5 @@
 // app/(app)/announcements.tsx
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ArrowLeft, Megaphone, Plus, X } from "lucide-react-native";
@@ -118,6 +119,7 @@ export default function AnnouncementsScreen() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [posting, setPosting] = useState(false);
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   const loadAnnouncements = useCallback(async () => {
     try {
@@ -183,7 +185,7 @@ export default function AnnouncementsScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F5F7F6]" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-[#F5F7F6]" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -216,7 +218,7 @@ export default function AnnouncementsScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

@@ -1,4 +1,5 @@
 // app/(app)/leave/index.tsx
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -85,6 +86,7 @@ export default function LeaveScreen() {
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [reason, setReason] = useState("");
   const insets = useSafeAreaInsets();
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   const loadLeaves = useCallback(async () => {
     try {
@@ -158,7 +160,7 @@ export default function LeaveScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -197,7 +199,7 @@ export default function LeaveScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

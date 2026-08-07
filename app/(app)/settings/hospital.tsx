@@ -1,4 +1,5 @@
 // app/(app)/settings/hospital.tsx
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
@@ -43,6 +44,7 @@ export default function HospitalSettingsScreen() {
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [geofenceRadius, setGeofenceRadius] = useState("100");
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -152,7 +154,7 @@ export default function HospitalSettingsScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -204,7 +206,7 @@ export default function HospitalSettingsScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 42 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
       >
         {isFirstSetup && (
           <View className="mx-6 mt-6  bg-amber-50 border border-amber-100 rounded-2xl px-4 py-6">

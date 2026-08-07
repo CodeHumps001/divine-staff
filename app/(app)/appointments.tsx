@@ -1,3 +1,4 @@
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
@@ -62,6 +63,7 @@ export default function AppointmentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   const loadAppointments = useCallback(async () => {
     if (!isDoctor) return;
@@ -128,7 +130,7 @@ export default function AppointmentsScreen() {
   ).length;
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -153,7 +155,7 @@ export default function AppointmentsScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

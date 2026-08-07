@@ -3,6 +3,7 @@ import "../global.css"; // 👈 add this line — must be first/near the top
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar"; // NEW
 import { useEffect, useState } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context"; // 👈 ADD THIS IMPORT
 import { useAuthStore } from "../lib/store";
 
 export default function RootLayout() {
@@ -16,7 +17,8 @@ export default function RootLayout() {
   if (!hydrated) return null;
 
   return (
-    <>
+    <SafeAreaProvider>
+      {/* 👈 WRAP THE ROOT HERE */}
       <StatusBar style="light" />
       {/* "light" = light-colored icons (white clock/battery/signal),
           which is what you want against your dark green gradient headers.
@@ -28,6 +30,6 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)/login" />
         <Stack.Screen name="(app)" />
       </Stack>
-    </>
+    </SafeAreaProvider>
   );
 }

@@ -1,3 +1,4 @@
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ArrowLeft, MessageSquare, ShieldAlert } from "lucide-react-native";
@@ -44,6 +45,7 @@ export default function FeedbackScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   const loadFeedback = useCallback(async () => {
     if (!isSuperAdmin) return;
@@ -92,7 +94,7 @@ export default function FeedbackScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -115,7 +117,7 @@ export default function FeedbackScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

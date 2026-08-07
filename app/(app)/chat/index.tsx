@@ -1,4 +1,5 @@
 // app/(app)/chat/index.tsx
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
@@ -118,6 +119,8 @@ export default function ChatListScreen() {
   const [staffList, setStaffList] = useState<StaffUser[]>([]);
   const [search, setSearch] = useState("");
   const [starting, setStarting] = useState(false);
+
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   const loadConversations = useCallback(async () => {
     try {
@@ -259,7 +262,16 @@ export default function ChatListScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
+    // edges intentionally empty: this screen already handles both edges
+    // itself, so letting SafeAreaView apply either would double-pad it.
+    // Top: the LinearGradient below sets its own
+    // `paddingTop: insets.top + 12`, so it already clears the status
+    // bar/notch — an additional "top" edge here just adds a second,
+    // unstyled gap above the gradient (the blank white/gray strip).
+    // Bottom: `tabBarSafeBottom` on the ScrollView already folds in the
+    // device's bottom inset (see lib/useTabBarHeight.ts), so a "bottom"
+    // edge here would double that padding too.
+    <SafeAreaView className="flex-1 bg-gray-50" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -285,7 +297,7 @@ export default function ChatListScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

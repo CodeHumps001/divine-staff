@@ -1,3 +1,4 @@
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ArrowLeft, Plus, ShieldAlert, UserX, X } from "lucide-react-native";
@@ -128,6 +129,7 @@ export default function StaffManagementScreen() {
   const [position, setPosition] = useState("NURSE");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   const loadData = useCallback(async () => {
     if (!isSuperAdmin) return;
@@ -248,7 +250,7 @@ export default function StaffManagementScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -277,7 +279,7 @@ export default function StaffManagementScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

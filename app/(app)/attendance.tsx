@@ -1,4 +1,5 @@
 // app/(app)/attendance.tsx
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ArrowLeft, Clock } from "lucide-react-native";
@@ -47,6 +48,8 @@ export default function AttendanceScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   const loadRecords = useCallback(async () => {
     try {
@@ -124,7 +127,7 @@ export default function AttendanceScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

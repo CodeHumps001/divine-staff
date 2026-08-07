@@ -59,6 +59,17 @@ const shiftDotColor = (name: string) => {
   return "#006B3C";
 };
 
+// The API returns date-only values like "2026-07-04T00:00:00.000Z". Reading
+// those with `new Date(str).toDateString()` converts through the device's
+// local timezone, which can roll the date backward or forward a day
+// depending on the device's UTC offset — silently breaking the lookup key
+// used to match a shift to its calendar cell. Pulling y/m/d straight out of
+// the string avoids that entirely.
+function dateKeyFromApi(dateStr: string) {
+  const [y, m, d] = dateStr.split("T")[0].split("-").map(Number);
+  return new Date(y, m - 1, d).toDateString();
+}
+
 export default function ShiftsScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -95,7 +106,7 @@ export default function ShiftsScreen() {
   const shiftsByDay = useMemo(() => {
     const map: Record<string, Shift> = {};
     shifts.forEach((s) => {
-      map[new Date(s.date).toDateString()] = s;
+      map[dateKeyFromApi(s.date)] = s;
     });
     return map;
   }, [shifts]);
@@ -201,50 +212,59 @@ export default function ShiftsScreen() {
         style={{ paddingTop: insets.top + 12 }}
         className="mx-4 rounded-[28px] px-4 py-4"
       >
-        <View className="flex-row items-center p-5">
+        <View className="flex-row items-center py-2 px-1">
           <TouchableOpacity
             onPress={() => router.back()}
-            className="w-10 h-10 rounded-full items-center justify-center bg-white/15"
+            className="w-9 h-9 rounded-full items-center justify-center bg-white/15 flex-shrink-0"
           >
-            <ArrowLeft size={20} color="#ffffff" />
+            <ArrowLeft size={18} color="#ffffff" />
           </TouchableOpacity>
-          <View className="flex-1 items-center">
-            <Text className="text-white text-base font-semibold">
+          <View className="flex-1 items-center px-1">
+            <Text
+              numberOfLines={1}
+              className="text-white text-base font-semibold"
+            >
               My Shifts
             </Text>
           </View>
-          <View className="flex-row items-center gap-2   right-5">
+          {/* `gap-2` alone spaces these buttons — no per-button margin
+              needed on top of it, and no position class means `right-*`
+              utilities don't apply. Both of those were silently padding
+              this row wider than the header had room for on narrower
+              screens. flex-shrink-0 keeps the icons from ever being the
+              thing that gets squeezed instead of the title. */}
+          <View className="flex-row items-center gap-1.5 flex-shrink-0">
             {canManageShifts && (
               <TouchableOpacity
                 onPress={() => router.push("/(app)/shifts/generate")}
-                className="w-10 h-10 rounded-full items-center justify-center bg-white/15 mr-2"
+                className="w-9 h-9 rounded-full items-center justify-center bg-white/15"
               >
-                <Settings2 size={18} color="#ffffff" />
+                <Settings2 size={16} color="#ffffff" />
               </TouchableOpacity>
             )}
             <TouchableOpacity
               onPress={handleExportPdf}
               disabled={exporting}
-              className="w-10 h-10 rounded-full items-center justify-center bg-white/15"
+              className="w-9 h-9 rounded-full items-center justify-center bg-white/15"
             >
               {exporting ? (
                 <ActivityIndicator size="small" color="#ffffff" />
               ) : (
-                <Download size={18} color="#ffffff" />
+                <Download size={16} color="#ffffff" />
               )}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push("/(app)/shifts/swap")}
-              className="w-10 h-10 rounded-full items-center justify-center bg-white/15 mr-2"
+              className="w-9 h-9 rounded-full items-center justify-center bg-white/15"
             >
-              <ArrowLeftRight size={18} color="#ffffff" />
+              <ArrowLeftRight size={16} color="#ffffff" />
             </TouchableOpacity>
             {(user?.role === "DEPT_HEAD" || user?.role === "SUPER_ADMIN") && (
               <TouchableOpacity
                 onPress={() => router.push("/(app)/shifts/swap-review")}
-                className="w-10 h-10 rounded-full items-center justify-center bg-white/15 mr-2"
+                className="w-9 h-9 rounded-full items-center justify-center bg-white/15"
               >
-                <Notebook size={18} color="#ffffff" />
+                <Notebook size={16} color="#ffffff" />
               </TouchableOpacity>
             )}
           </View>

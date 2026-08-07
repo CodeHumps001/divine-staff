@@ -1,4 +1,5 @@
 // app/(app)/dashboard.tsx
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
@@ -279,6 +280,7 @@ export default function DashboardScreen() {
     [],
   );
   const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -470,10 +472,10 @@ export default function DashboardScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F5F7F6]" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-[#F5F7F6]" edges={[]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

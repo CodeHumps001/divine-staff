@@ -1,4 +1,5 @@
 // app/(app)/shifts/generate.tsx
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ArrowLeft, Building2, Check, ShieldAlert } from "lucide-react-native";
@@ -68,6 +69,22 @@ export default function GenerateShiftScreen() {
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(
     user?.departmentId || null,
   );
+
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
+
+  // `useAuthStore` rehydrates `user` asynchronously from secure storage on
+  // app launch. If this screen mounts before that finishes, `user` is null
+  // at the instant `useState` above runs its initializer — and since that
+  // initializer only ever runs once, `selectedDeptId` would stay stuck at
+  // null forever, even after `user` populates a moment later. This effect
+  // catches that case and syncs it once the real value shows up, which is
+  // what was causing dept heads to see an empty department: the staff-load
+  // effect never fired because `selectedDeptId` was never set.
+  useEffect(() => {
+    if (!isSuperAdminRole && user?.departmentId && !selectedDeptId) {
+      setSelectedDeptId(user.departmentId);
+    }
+  }, [user?.departmentId, isSuperAdminRole, selectedDeptId]);
 
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -166,7 +183,7 @@ export default function GenerateShiftScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -186,7 +203,7 @@ export default function GenerateShiftScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
       >
         {/* ── Department picker, SUPER_ADMIN only ── */}
         {isSuperAdminRole && (

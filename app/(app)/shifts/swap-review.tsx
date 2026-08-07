@@ -1,3 +1,4 @@
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
@@ -57,6 +58,8 @@ export default function SwapReviewScreen() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   useEffect(() => {
     if (!isSuperAdminRole) return;
@@ -133,7 +136,7 @@ export default function SwapReviewScreen() {
   const pendingCount = requests.filter((r) => r.status === "PENDING").length;
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -158,7 +161,7 @@ export default function SwapReviewScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

@@ -1,4 +1,5 @@
 // app/(app)/shifts/swap.tsx
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
@@ -210,6 +211,8 @@ export default function ShiftSwapScreen() {
     useState<ColleagueShift | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
+
   const loadRequests = useCallback(async () => {
     try {
       const res = await Staff.getMySwapRequests();
@@ -326,7 +329,7 @@ export default function ShiftSwapScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -357,7 +360,7 @@ export default function ShiftSwapScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

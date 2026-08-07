@@ -1,4 +1,5 @@
 // app/(app)/leave/department.tsx
+import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
@@ -13,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -21,6 +23,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import {
@@ -83,6 +86,8 @@ export default function DepartmentLeaveScreen() {
   );
   const [reviewNote, setReviewNote] = useState("");
   const [reviewing, setReviewing] = useState(false);
+
+  const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
   // ── Load department list, SUPER_ADMIN only ──
   useEffect(() => {
@@ -175,7 +180,7 @@ export default function DepartmentLeaveScreen() {
   const pendingCount = leaves.filter((l) => l.status === "PENDING").length;
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={[]}>
       <LinearGradient
         colors={["#0F766E", "#15803D"]}
         start={{ x: 0, y: 0 }}
@@ -200,7 +205,7 @@ export default function DepartmentLeaveScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSafeBottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -311,7 +316,6 @@ export default function DepartmentLeaveScreen() {
         </View>
       </ScrollView>
 
-      {/* ── Review modal ── */}
       <Modal
         visible={!!reviewTarget}
         animationType="slide"
@@ -319,74 +323,92 @@ export default function DepartmentLeaveScreen() {
         onRequestClose={() => setReviewTarget(null)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           className="flex-1"
         >
-          <View className="flex-1 bg-black/40 justify-end">
-            <View className="bg-white rounded-t-[28px] px-5 pt-5 pb-8">
-              <View className="flex-row items-center justify-between mb-5">
-                <Text className="text-gray-900 text-lg font-bold">
-                  Review Leave
-                </Text>
-                <TouchableOpacity onPress={() => setReviewTarget(null)}>
-                  <X size={22} color="#6B7280" />
-                </TouchableOpacity>
-              </View>
-
-              <Text className="text-gray-500 text-sm mb-1">
-                {reviewTarget?.user.firstName} {reviewTarget?.user.lastName}
-              </Text>
-              <Text className="text-gray-900 font-medium mb-4">
-                {reviewTarget &&
-                  new Date(reviewTarget.startDate).toDateString()}{" "}
-                →{" "}
-                {reviewTarget && new Date(reviewTarget.endDate).toDateString()}
-              </Text>
-
-              <Text className="text-gray-700 text-sm font-medium mb-1.5">
-                Note (optional)
-              </Text>
-              <TextInput
-                value={reviewNote}
-                onChangeText={setReviewNote}
-                placeholder="Add a note for the staff member..."
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={3}
-                className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-5"
-                style={{ textAlignVertical: "top", minHeight: 90 }}
-              />
-
-              <View className="flex-row gap-3">
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View className="flex-1 bg-black/40">
+              <ScrollView
+                contentContainerStyle={{
+                  flexGrow: 1,
+                  justifyContent: "flex-end",
+                }}
+                bounces={false}
+                keyboardShouldPersistTaps="handled"
+              >
                 <TouchableOpacity
-                  onPress={() => handleReview("REJECTED")}
-                  disabled={reviewing}
-                  className="flex-1 bg-red-50 rounded-xl py-4 items-center justify-center flex-row"
-                >
-                  <X size={16} color="#DC2626" />
-                  <Text className="text-red-600 font-semibold ml-1.5">
-                    Reject
+                  className="flex-1"
+                  activeOpacity={1}
+                  onPress={() => setReviewTarget(null)}
+                />
+
+                <View className="bg-white rounded-t-[28px] px-5 pt-5 pb-8">
+                  <View className="flex-row items-center justify-between mb-5">
+                    <Text className="text-gray-900 text-lg font-bold">
+                      Review Leave
+                    </Text>
+                    <TouchableOpacity onPress={() => setReviewTarget(null)}>
+                      <X size={22} color="#6B7280" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text className="text-gray-500 text-sm mb-1">
+                    {reviewTarget?.user.firstName} {reviewTarget?.user.lastName}
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleReview("APPROVED")}
-                  disabled={reviewing}
-                  className="flex-1 bg-[#006B3C] rounded-xl py-4 items-center justify-center flex-row"
-                >
-                  {reviewing ? (
-                    <ActivityIndicator color="#ffffff" size="small" />
-                  ) : (
-                    <>
-                      <Check size={16} color="#ffffff" />
-                      <Text className="text-white font-semibold ml-1.5">
-                        Approve
+                  <Text className="text-gray-900 font-medium mb-4">
+                    {reviewTarget &&
+                      new Date(reviewTarget.startDate).toDateString()}{" "}
+                    →{" "}
+                    {reviewTarget &&
+                      new Date(reviewTarget.endDate).toDateString()}
+                  </Text>
+
+                  <Text className="text-gray-700 text-sm font-medium mb-1.5">
+                    Note (optional)
+                  </Text>
+                  <TextInput
+                    value={reviewNote}
+                    onChangeText={setReviewNote}
+                    placeholder="Add a note for the staff member..."
+                    placeholderTextColor="#9CA3AF"
+                    multiline
+                    numberOfLines={3}
+                    className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 text-sm mb-5"
+                    style={{ textAlignVertical: "top", minHeight: 90 }}
+                  />
+
+                  <View className="flex-row gap-3">
+                    <TouchableOpacity
+                      onPress={() => handleReview("REJECTED")}
+                      disabled={reviewing}
+                      className="flex-1 bg-red-50 rounded-xl py-4 items-center justify-center flex-row"
+                    >
+                      <X size={16} color="#DC2626" />
+                      <Text className="text-red-600 font-semibold ml-1.5">
+                        Reject
                       </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleReview("APPROVED")}
+                      disabled={reviewing}
+                      className="flex-1 bg-[#006B3C] rounded-xl py-4 items-center justify-center flex-row"
+                    >
+                      {reviewing ? (
+                        <ActivityIndicator color="#ffffff" size="small" />
+                      ) : (
+                        <>
+                          <Check size={16} color="#ffffff" />
+                          <Text className="text-white font-semibold ml-1.5">
+                            Approve
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </ScrollView>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
