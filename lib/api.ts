@@ -1,7 +1,9 @@
 import axios from "axios";
 import { storage } from "./storage";
 
-const API_URL = "https://devine-care-backend.onrender.com/api/v1";
+// const API_URL = "https://devine-care-backend.onrender.com/api/v1";
+export const API_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? "http://172.20.10.3:5000/api/v1";
 
 export const publicApi = axios.create({
   baseURL: API_URL,

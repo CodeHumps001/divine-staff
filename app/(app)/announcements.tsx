@@ -237,7 +237,7 @@ export default function AnnouncementsScreen() {
                 key={a.id}
                 onPress={() => setSelected(a)}
                 activeOpacity={0.85}
-                className="bg-white rounded-2xl p-4 border border-gray-100 mb-3 shadow-sm"
+                className="bg-white rounded-2xl p-4 border border-orange-100 mb-3 shadow-3xl"
               >
                 <View className="flex-row items-start justify-between">
                   <View className="w-9 h-9 rounded-xl bg-green-50 items-center justify-center mr-3">

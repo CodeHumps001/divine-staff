@@ -22,6 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import type { TextInputInstance } from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -139,7 +140,7 @@ export default function ChatThreadScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const listRef = useRef<FlatList>(null);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);

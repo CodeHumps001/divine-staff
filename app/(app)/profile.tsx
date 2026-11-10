@@ -323,7 +323,7 @@ export default function ProfileScreen() {
         }}
       >
         <View
-          className="rounded-[28px] border border-gray-100 bg-white p-4"
+          className="rounded-[12px] border border-gray-100 bg-white p-4"
           style={{
             shadowColor: "#0F172A",
             shadowOpacity: 0.06,
@@ -355,11 +355,6 @@ export default function ProfileScreen() {
               <Text className="text-gray-500 text-sm mt-1">
                 {user?.department?.name || "Department not set"}
               </Text>
-              <View className="mt-2 self-start rounded-full bg-emerald-50 px-3 py-1">
-                <Text className="text-emerald-700 text-[11px] font-semibold">
-                  Profile ready
-                </Text>
-              </View>
             </View>
 
             <TouchableOpacity
@@ -371,32 +366,11 @@ export default function ProfileScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-
-          <View className="mt-4 h-px bg-gray-100" />
-
-          <View className="mt-4 flex-row gap-2">
-            <View className="flex-1 rounded-[18px] bg-slate-50 p-3">
-              <Text className="text-gray-400 text-[10px] font-semibold uppercase tracking-[0.2em]">
-                Email
-              </Text>
-              <Text className="text-gray-700 text-sm font-medium mt-1">
-                {user?.email || "—"}
-              </Text>
-            </View>
-            <View className="flex-1 rounded-[18px] bg-emerald-50 p-3">
-              <Text className="text-emerald-600 text-[10px] font-semibold uppercase tracking-[0.2em]">
-                Status
-              </Text>
-              <Text className="text-emerald-700 text-sm font-medium mt-1">
-                Active
-              </Text>
-            </View>
-          </View>
         </View>
 
-        <View className="mt-5 rounded-[28px] border border-gray-100 bg-white p-4">
+        <View className="mt-5 rounded-[12px] border border-gray-100 bg-white p-4">
           <Text className="text-gray-900 font-semibold mb-3">
-            Account details
+            Personal Information
           </Text>
           <InfoRow
             icon={<Mail size={16} color="#0F766E" />}
@@ -422,7 +396,7 @@ export default function ProfileScreen() {
         </View>
 
         {!!user?.profile?.bio && (
-          <View className="mt-5 rounded-[24px] border border-gray-100 bg-white p-4">
+          <View className="mt-5 rounded-[12px] border border-gray-100 bg-white p-4">
             <Text className="text-gray-900 font-semibold mb-2">About</Text>
             <Text className="text-gray-500 text-sm leading-5">
               {user.profile.bio}
@@ -433,7 +407,7 @@ export default function ProfileScreen() {
         {/* ── Security ── */}
         <TouchableOpacity
           onPress={() => setPwModalOpen(true)}
-          className="mt-5 flex-row items-center rounded-[22px] border border-gray-100 bg-white p-4"
+          className="mt-5 flex-row items-center rounded-[12px] border border-gray-100 bg-white p-4"
         >
           <View className="w-9 h-9 rounded-xl bg-gray-50 items-center justify-center mr-3">
             <Lock size={16} color="#6B7280" />
@@ -449,7 +423,7 @@ export default function ProfileScreen() {
         {/* ── Feedback ── */}
         <TouchableOpacity
           onPress={() => setFeedbackOpen(true)}
-          className="mt-3 flex-row items-center rounded-[22px] border border-gray-100 bg-white p-4"
+          className="mt-3 flex-row items-center rounded-[12px] border border-gray-100 bg-white p-4"
         >
           <View className="w-9 h-9 rounded-xl bg-emerald-50 items-center justify-center mr-3">
             <MessageSquarePlus size={17} color="#0F766E" />
@@ -464,7 +438,7 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           onPress={handleLogout}
-          className="mt-3 flex-row items-center justify-center rounded-[22px] border border-red-100 bg-red-50 p-4"
+          className="mt-3 flex-row items-center justify-center rounded-[12px] border border-red-100 bg-red-50 p-4"
         >
           <LogOut size={18} color="#DC2626" />
           <Text className="ml-2 font-semibold text-red-600">Log Out</Text>

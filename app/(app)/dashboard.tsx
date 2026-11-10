@@ -213,7 +213,7 @@ function SquareQuickAction({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      className="bg-white rounded-[18px] items-center justify-center gap-2 border border-gray-100 px-3"
+      className="bg-white rounded-[12px] items-center justify-center gap-2 border border-gray-100 px-3"
       style={{
         width: 108,
         height: 108,
@@ -482,7 +482,7 @@ export default function DashboardScreen() {
       >
         {/* ─── PREMIUM HEADER ─────────────────────────────────── */}
         <View
-          className="mx-4 overflow-hidden rounded-[28px]"
+          className="mx-4 overflow-hidden rounded-[12px]"
           style={{ marginTop: insets.top + 12 }}
         >
           <LinearGradient
@@ -533,7 +533,7 @@ export default function DashboardScreen() {
         {!isSuperAdmin && (
           <View className="mx-4 mt-4">
             <View
-              className="bg-white rounded-[24px] px-5 py-4 border border-gray-100"
+              className=" rounded-[12px] px-4 py-4 border border-gray-100"
               style={{
                 shadowColor: "#0F172A",
                 shadowOpacity: 0.06,
@@ -544,7 +544,7 @@ export default function DashboardScreen() {
             >
               <View className="flex-row items-center justify-between">
                 <View className="flex-1 pr-3">
-                  <Text className="text-gray-400 text-[10px] font-semibold uppercase tracking-[0.2em]">
+                  <Text className="text-gray-400 text-[10px] font-bold uppercase">
                     Today's Status
                   </Text>
                   <View className="flex-row items-center mt-1">
@@ -567,7 +567,7 @@ export default function DashboardScreen() {
                   onPress={handleClockToggle}
                   disabled={clockingIn}
                   activeOpacity={0.8}
-                  className={`px-3 py-3 rounded-2xl flex-row items-center ${
+                  className={`px-3 py-3 rounded-2xl flex-row items-center  ${
                     clockedIn ? "bg-red-50" : "bg-emerald-600"
                   } ${clockingIn ? "opacity-60" : ""}`}
                 >
@@ -783,7 +783,7 @@ export default function DashboardScreen() {
           <View className="mx-4 mt-4">
             <View className="flex-row items-center justify-between mb-2">
               <Text className="text-gray-700 text-[13px] font-semibold">
-                Performance Snapshot
+                Performance
               </Text>
               <Text className="text-emerald-600 text-[10px] font-semibold">
                 Swipe for more
@@ -794,7 +794,7 @@ export default function DashboardScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{
-                paddingVertical: 2,
+                paddingVertical: 5,
                 paddingRight: 10,
                 paddingLeft: 0,
               }}
@@ -910,7 +910,7 @@ export default function DashboardScreen() {
             </View>
 
             <View
-              className="bg-white rounded-[24px] px-5 py-4 border border-gray-100"
+              className="bg-white rounded-[12px] px-5 py-4 border border-gray-100"
               style={{
                 shadowColor: "#0F172A",
                 shadowOpacity: 0.05,
@@ -975,7 +975,7 @@ export default function DashboardScreen() {
           <TouchableOpacity
             onPress={() => router.push("/(app)/announcements")}
             activeOpacity={0.7}
-            className="mx-4 mt-4 bg-white rounded-[24px] px-5 py-4 border border-gray-100 flex-row items-center"
+            className="mx-4 mt-4 bg-white rounded-[12px] px-5 py-4 border border-gray-100 flex-row items-center"
             style={{
               shadowColor: "#0F172A",
               shadowOpacity: 0.05,

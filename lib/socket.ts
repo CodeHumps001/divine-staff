@@ -2,7 +2,7 @@ import * as SecureStore from "expo-secure-store";
 import { io, Socket } from "socket.io-client";
 
 // same host as API_URL in lib/api.ts, without the /api/v1 prefix
-const SOCKET_URL = "https://devine-care-backend.onrender.com";
+const SOCKET_URL = "http://192.168.36.107:5000";
 
 let socket: Socket | null = null;
 

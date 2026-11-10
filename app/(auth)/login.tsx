@@ -1,9 +1,12 @@
 import { useRouter } from "expo-router";
+import { isAxiosError } from "axios";
 import { ArrowRight, Eye, EyeOff } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   ImageBackground,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Auth } from "../../lib/api";
+import { API_URL, Auth } from "../../lib/api";
 import { useAuthStore } from "../../lib/store";
 
 const CAROUSEL_SLIDES = [
@@ -37,6 +40,9 @@ const CAROUSEL_SLIDES = [
   },
 ];
 
+const TOP_SECTION_HEIGHT = 440;
+const TOP_SECTION_COLLAPSED_HEIGHT = 120;
+
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuthStore();
@@ -54,6 +60,28 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Drives the collapse animation of the top image section
+  const topSectionAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(topSectionAnim, {
+      toValue: isFocused ? 1 : 0,
+      duration: 250,
+      useNativeDriver: false, // height isn't supported by the native driver
+    }).start();
+  }, [isFocused]);
+
+  const animatedTopHeight = topSectionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [TOP_SECTION_HEIGHT, TOP_SECTION_COLLAPSED_HEIGHT],
+  });
+
+  const animatedContentOpacity = topSectionAnim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [1, 0, 0],
+  });
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -63,20 +91,38 @@ export default function LoginScreen() {
     return () => clearInterval(timer);
   }, []);
 
+  const handleFocus = () => setIsFocused(true);
+  const handleBlur = () => setIsFocused(false);
+
   const handleLogin = async () => {
     if (!email || !password) {
       setError("Please fill in both fields");
       return;
     }
+    Keyboard.dismiss();
     setLoading(true);
     setError("");
     try {
-      const res = await Auth.login(email, password);
+      const res = await Auth.login(email.trim(), password);
       const { token, user } = res.data.data;
       await login(user, token);
       router.replace("/(app)/dashboard");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Wrong email or password");
+    } catch (err: unknown) {
+      if (isAxiosError(err)) {
+        const responseMessage = err.response?.data?.message;
+
+        if (typeof responseMessage === "string" && responseMessage.length > 0) {
+          setError(responseMessage);
+        } else if (!err.response) {
+          setError(
+            `Can't reach the server at ${API_URL}. Check that the backend is running and this device can access that address.`,
+          );
+        } else {
+          setError(`Sign-in failed (HTTP ${err.response.status}).`);
+        }
+      } else {
+        setError("Something went wrong while signing in. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -85,7 +131,8 @@ export default function LoginScreen() {
   return (
     <View className="flex-1 bg-white">
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "android" ? 0 : 0}
         className="flex-1"
       >
         <ScrollView
@@ -93,40 +140,46 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── TOP SECTION: Pushed height to h-[440px] to make image dominant ── */}
-          <ImageBackground
-            source={CAROUSEL_SLIDES[activeSlide].image}
-            className="h-[440px] justify-end"
-            resizeMode="cover"
-          >
-            {/* 🌿 Premium Rich Army Green Gradient Overlay Layer 🌿 */}
-            <View className="absolute inset-0 bg-gradient-to-b from-[#1C3326]/40 via-[#14261C]/80 to-[#0B140E]" />
+          {/* ── TOP SECTION: animates shorter when an input is focused ── */}
+          <Animated.View style={{ height: animatedTopHeight }}>
+            <ImageBackground
+              source={CAROUSEL_SLIDES[activeSlide].image}
+              className="flex-1 justify-end"
+              resizeMode="cover"
+            >
+              {/* 🌿 Premium Rich Army Green Gradient Overlay Layer 🌿 */}
+              <View className="absolute inset-0 bg-gradient-to-b from-[#1C3326]/40 via-[#14261C]/80 to-[#0B140E]" />
 
-            {/* Text Overlay Wrapper */}
-            <View className="px-8 pb-10 z-10">
-              <Text className="text-white text-3xl font-extrabold tracking-tight">
-                {CAROUSEL_SLIDES[activeSlide].title}
-              </Text>
+              {/* Text Overlay Wrapper — fades out as the section collapses */}
+              <Animated.View
+                className="px-8 pb-10 z-10"
+                style={{ opacity: animatedContentOpacity }}
+                pointerEvents={isFocused ? "none" : "auto"}
+              >
+                <Text className="text-white text-3xl font-extrabold tracking-tight">
+                  {CAROUSEL_SLIDES[activeSlide].title}
+                </Text>
 
-              <Text className="text-emerald-100/90 text-sm mt-2 leading-5 min-h-[40px]">
-                {CAROUSEL_SLIDES[activeSlide].message}
-              </Text>
+                <Text className="text-emerald-100/90 text-sm mt-2 leading-5 min-h-[40px]">
+                  {CAROUSEL_SLIDES[activeSlide].message}
+                </Text>
 
-              {/* Progress Indicator Dots */}
-              <View className="flex-row gap-1.5 mt-4">
-                {CAROUSEL_SLIDES.map((_, index) => (
-                  <View
-                    key={index}
-                    className={`h-1.5 rounded-full ${
-                      index === activeSlide
-                        ? "w-5 bg-emerald-400"
-                        : "w-1.5 bg-white/30"
-                    }`}
-                  />
-                ))}
-              </View>
-            </View>
-          </ImageBackground>
+                {/* Progress Indicator Dots */}
+                <View className="flex-row gap-1.5 mt-4">
+                  {CAROUSEL_SLIDES.map((_, index) => (
+                    <View
+                      key={index}
+                      className={`h-1.5 rounded-full ${
+                        index === activeSlide
+                          ? "w-5 bg-emerald-400"
+                          : "w-1.5 bg-white/30"
+                      }`}
+                    />
+                  ))}
+                </View>
+              </Animated.View>
+            </ImageBackground>
+          </Animated.View>
 
           {/* ── BOTTOM SECTION: Compact, Pure White Form Area ── */}
           <View
@@ -151,12 +204,14 @@ export default function LoginScreen() {
 
             {/* Email Input Field */}
             <View className="mb-4">
-              <Text className="text-gray-700 text-xs font-bold uppercase tracking-wider mb-1.5">
+              <Text className="text-gray-700 text-sm font-bold uppercase  mb-1.5">
                 Email Address
               </Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 placeholder="yourname@email.com"
                 placeholderTextColor="#9CA3AF"
                 keyboardType="email-address"
@@ -168,13 +223,15 @@ export default function LoginScreen() {
 
             {/* Password Input Field */}
             <View className="mb-6">
-              <Text className="text-gray-700 text-xs font-bold uppercase tracking-wider mb-1.5">
+              <Text className="text-gray-700 text-sm font-bold uppercase  mb-1.5">
                 Password
               </Text>
               <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4">
                 <TextInput
                   value={password}
                   onChangeText={setPassword}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
                   placeholder="••••••••"
                   placeholderTextColor="#9CA3AF"
                   secureTextEntry={!showPassword}
@@ -200,17 +257,17 @@ export default function LoginScreen() {
               <View className="w-full rounded-xl py-4 items-center justify-center flex-row bg-emerald-800 shadow-md">
                 <ActivityIndicator color="#ffffff" size="small" />
                 <Text className="text-white font-medium text-sm ml-2.5">
-                  Checking your info...
+                  Verifying info
                 </Text>
               </View>
             ) : (
               <TouchableOpacity
                 onPress={handleLogin}
                 activeOpacity={0.9}
-                className="w-full rounded-xl py-4 items-center justify-center flex-row bg-[#004D2C] shadow-md"
+                className="w-full rounded-xl py-4 items-center justify-center flex-row bg-[#053420] shadow-md"
               >
-                <Text className="text-white font-bold text-sm tracking-wide mr-2">
-                  Log In Securely
+                <Text className="text-white font-bold text-xl tracking-wide mr-2">
+                  Access Dashboard
                 </Text>
                 <ArrowRight size={16} color="#ffffff" />
               </TouchableOpacity>
