@@ -1,4 +1,4 @@
-// app/(app)/profile.tsx
+// app/(app)/(tabs)/profile.tsx
 import Constants from "expo-constants";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -34,9 +34,9 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { Auth, Staff } from "../../lib/api";
-import { useAuthStore } from "../../lib/store";
-import { useTabBarSafeBottomPadding } from "../../lib/useTabBarHeight";
+import { Auth, Staff } from "../../../lib/api";
+import { useAuthStore } from "../../../lib/store";
+import { useTabBarSafeBottomPadding } from "../../../lib/useTabBarHeight";
 
 const FEEDBACK_CATEGORIES = [
   { key: "GENERAL", label: "General" },

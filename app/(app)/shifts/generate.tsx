@@ -57,7 +57,7 @@ export default function GenerateShiftScreen() {
 
   useEffect(() => {
     if (!canManageShifts) {
-      router.replace("/(app)/shifts");
+      router.replace("/(app)/(tabs)/shifts");
     }
   }, [canManageShifts]);
 

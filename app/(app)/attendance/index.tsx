@@ -1,7 +1,7 @@
-// app/(app)/attendance.tsx
+// app/(app)/attendance/index.tsx
 import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useRouter, type ErrorBoundaryProps } from "expo-router";
 import { ArrowLeft, Clock } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Staff } from "../../lib/api";
+import { Staff } from "../../../lib/api";
 
 type AttendanceRecord = {
   id: string;
@@ -48,6 +48,7 @@ export default function AttendanceScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const tabBarSafeBottom = useTabBarSafeBottomPadding();
 
@@ -63,6 +64,11 @@ export default function AttendanceScreen() {
       setRecords(data);
     } catch (err) {
       console.log("Attendance load error:", err);
+      setLoadError(
+        err instanceof Error
+          ? err.message
+          : "Could not load attendance records.",
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -75,6 +81,7 @@ export default function AttendanceScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
+    setLoadError(null);
     loadRecords();
   };
 
@@ -132,6 +139,21 @@ export default function AttendanceScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        {loadError && (
+          <View className="mx-6 mt-6 rounded-2xl border border-red-100 bg-red-50 p-4">
+            <Text className="text-sm font-medium text-red-700">
+              Could not load attendance
+            </Text>
+            <Text className="mt-1 text-xs text-red-600">{loadError}</Text>
+            <TouchableOpacity
+              onPress={onRefresh}
+              className="mt-3 self-start rounded-xl bg-red-100 px-4 py-2"
+            >
+              <Text className="text-sm font-semibold text-red-700">Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* ── Monthly summary ── */}
         <View className="mx-6 mt-6 bg-white rounded-2xl p-4 border border-gray-100 flex-row shadow-sm">
           <SummaryStat
@@ -190,6 +212,25 @@ export default function AttendanceScreen() {
           )}
         </View>
       </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <SafeAreaView className="flex-1 items-center justify-center bg-gray-50 px-6">
+      <Text className="text-center text-base font-semibold text-gray-900">
+        Attendance could not be displayed
+      </Text>
+      <Text className="mt-2 text-center text-sm text-gray-500">
+        {error.message}
+      </Text>
+      <TouchableOpacity
+        onPress={retry}
+        className="mt-5 rounded-xl bg-[#006B3C] px-5 py-3"
+      >
+        <Text className="font-semibold text-white">Try again</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }

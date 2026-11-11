@@ -56,7 +56,7 @@ export default function AppointmentsScreen() {
   const isDoctor = user?.position === "DOCTOR";
 
   useEffect(() => {
-    if (!isDoctor) router.replace("/(app)/dashboard");
+    if (!isDoctor) router.replace("/(app)/(tabs)/dashboard");
   }, [isDoctor]);
 
   const [loading, setLoading] = useState(true);

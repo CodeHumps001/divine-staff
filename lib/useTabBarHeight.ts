@@ -1,7 +1,7 @@
 // lib/useTabBarHeight.ts
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// Must match the tabBarStyle values in app/(app)/_layout.tsx exactly —
+// Must match the tabBarStyle values in app/(app)/(tabs)/_layout.tsx exactly —
 // the tab bar is position: "absolute", so it floats over screen content
 // instead of pushing it up. Every scrollable screen needs to reserve this
 // much space at the bottom itself, or its last item(s) end up hidden

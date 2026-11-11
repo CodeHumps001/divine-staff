@@ -1,4 +1,4 @@
-// app/(app)/chat/index.tsx
+// app/(app)/(tabs)/chat.tsx
 import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";

@@ -1,4 +1,4 @@
-// app/(app)/announcements.tsx
+// app/(app)/(tabs)/announcements.tsx
 import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -22,8 +22,8 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { Staff } from "../../lib/api";
-import { useAuthStore } from "../../lib/store";
+import { Staff } from "../../../lib/api";
+import { useAuthStore } from "../../../lib/store";
 
 type Announcement = {
   id: string;

@@ -28,7 +28,7 @@ export default function HospitalSettingsScreen() {
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
   useEffect(() => {
-    if (!isSuperAdmin) router.replace("/(app)/dashboard");
+    if (!isSuperAdmin) router.replace("/(app)/(tabs)/dashboard");
   }, [isSuperAdmin]);
 
   const [loading, setLoading] = useState(true);

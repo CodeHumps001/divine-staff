@@ -1,4 +1,4 @@
-// app/(app)/dashboard.tsx
+// app/(app)/(tabs)/dashboard.tsx
 import { useTabBarSafeBottomPadding } from "@/lib/useTabBarHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
@@ -35,8 +35,8 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { Staff } from "../../lib/api";
-import { useAuthStore } from "../../lib/store";
+import { Staff } from "../../../lib/api";
+import { useAuthStore } from "../../../lib/store";
 
 type Department = { id: string; name: string };
 type DeptAttendanceRecord = {
@@ -509,7 +509,7 @@ export default function DashboardScreen() {
 
               <View className="flex-row items-center gap-2">
                 <TouchableOpacity
-                  onPress={() => router.push("/(app)/announcements")}
+                  onPress={() => router.push("/(app)/(tabs)/announcements")}
                   className="w-10 h-10 rounded-full bg-white/15 items-center justify-center"
                   activeOpacity={0.7}
                 >
@@ -519,7 +519,7 @@ export default function DashboardScreen() {
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => router.push("/(app)/profile")}
+                  onPress={() => router.push("/(app)/(tabs)/profile")}
                   className="w-10 h-10 rounded-full bg-white/15 items-center justify-center"
                   activeOpacity={0.7}
                 >
@@ -619,7 +619,7 @@ export default function DashboardScreen() {
                 <SquareQuickAction
                   icon={<Megaphone size={20} color="#059669" />}
                   label="Post Announcement"
-                  onPress={() => router.push("/(app)/announcements")}
+                  onPress={() => router.push("/(app)/(tabs)/announcements")}
                   accentColor="#059669"
                   accentBg="#D1FAE5"
                 />
@@ -852,14 +852,14 @@ export default function DashboardScreen() {
               <QuickAction
                 icon={<Calendar size={18} color="#D97706" />}
                 label="My Shifts"
-                onPress={() => router.push("/(app)/shifts")}
+                onPress={() => router.push("/(app)/(tabs)/shifts")}
                 accentColor="#D97706"
                 accentBg="#FEF3C7"
               />
               <QuickAction
                 icon={<Bell size={18} color="#059669" />}
                 label="Announcements"
-                onPress={() => router.push("/(app)/announcements")}
+                onPress={() => router.push("/(app)/(tabs)/announcements")}
                 accentColor="#059669"
                 accentBg="#D1FAE5"
               />
@@ -900,7 +900,7 @@ export default function DashboardScreen() {
                 Upcoming Shift
               </Text>
               <TouchableOpacity
-                onPress={() => router.push("/(app)/shifts")}
+                onPress={() => router.push("/(app)/(tabs)/shifts")}
                 activeOpacity={0.7}
               >
                 <Text className="text-emerald-600 text-xs font-semibold">
@@ -973,7 +973,7 @@ export default function DashboardScreen() {
         {/* ─── LATEST ANNOUNCEMENT ──────────────────────────────── */}
         {latestAnnouncement && (
           <TouchableOpacity
-            onPress={() => router.push("/(app)/announcements")}
+            onPress={() => router.push("/(app)/(tabs)/announcements")}
             activeOpacity={0.7}
             className="mx-4 mt-4 bg-white rounded-[12px] px-5 py-4 border border-gray-100 flex-row items-center"
             style={{

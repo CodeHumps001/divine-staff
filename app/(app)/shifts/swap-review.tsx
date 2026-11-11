@@ -49,7 +49,7 @@ export default function SwapReviewScreen() {
   const isSuperAdminRole = user?.role === "SUPER_ADMIN";
 
   useEffect(() => {
-    if (!canReview) router.replace("/(app)/shifts");
+    if (!canReview) router.replace("/(app)/(tabs)/shifts");
   }, [canReview]);
 
   const [loading, setLoading] = useState(true);

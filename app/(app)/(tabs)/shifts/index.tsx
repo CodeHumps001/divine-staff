@@ -1,4 +1,4 @@
-// app/(app)/shifts.tsx
+// app/(app)/(tabs)/shifts/index.tsx
 import { Staff } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 import { LinearGradient } from "expo-linear-gradient";

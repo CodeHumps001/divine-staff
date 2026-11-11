@@ -88,17 +88,17 @@ const handleNotificationTap = (data: NotificationData) => {
       if (data.conversationId) {
         router.push(`/(app)/chat/${data.conversationId}`);
       } else {
-        router.push("/(app)/chat");
+        router.push("/(app)/(tabs)/chat");
       }
       break;
     case "SHIFT_REMINDER":
-      router.push("/(app)/shifts");
+      router.push("/(app)/(tabs)/shifts");
       break;
     case "ANNOUNCEMENT":
-      router.push("/(app)/announcements");
+      router.push("/(app)/(tabs)/announcements");
       break;
     default:
-      router.push("/(app)/dashboard");
+      router.push("/(app)/(tabs)/dashboard");
   }
 };
 

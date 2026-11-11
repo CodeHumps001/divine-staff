@@ -106,7 +106,7 @@ export default function LoginScreen() {
       const res = await Auth.login(email.trim(), password);
       const { token, user } = res.data.data;
       await login(user, token);
-      router.replace("/(app)/dashboard");
+      router.replace("/(app)/(tabs)/dashboard");
     } catch (err: unknown) {
       if (isAxiosError(err)) {
         const responseMessage = err.response?.data?.message;

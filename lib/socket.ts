@@ -1,25 +1,35 @@
 import * as SecureStore from "expo-secure-store";
 import { io, Socket } from "socket.io-client";
+import { API_URL } from "./api";
 
-// same host as API_URL in lib/api.ts, without the /api/v1 prefix
-const SOCKET_URL = "http://192.168.36.107:5000";
+const SOCKET_URL = new URL(API_URL).origin;
 
 let socket: Socket | null = null;
+let socketPromise: Promise<Socket> | null = null;
 
-export const getSocket = async (): Promise<Socket> => {
-  if (socket?.connected) return socket;
+export const getSocket = (): Promise<Socket> => {
+  if (socket) return Promise.resolve(socket);
+  if (socketPromise) return socketPromise;
 
-  const token = await SecureStore.getItemAsync("lifecare_token");
+  socketPromise = SecureStore.getItemAsync("lifecare_token")
+    .then((token) => {
+      socket = io(SOCKET_URL, {
+        auth: { token },
+        transports: ["websocket"],
+      });
 
-  socket = io(SOCKET_URL, {
-    auth: { token },
-    transports: ["websocket"],
-  });
+      return socket;
+    })
+    .catch((error: unknown) => {
+      socketPromise = null;
+      throw error;
+    });
 
-  return socket;
+  return socketPromise;
 };
 
 export const disconnectSocket = () => {
   socket?.disconnect();
   socket = null;
+  socketPromise = null;
 };

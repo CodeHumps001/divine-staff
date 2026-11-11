@@ -224,6 +224,9 @@ export default function ChatThreadScreen() {
       socket.on("error", (err: { message: string }) => {
         console.log("Socket error:", err.message);
       });
+      socket.on("connect_error", (err: Error) => {
+        console.log("Chat connection error:", err.message);
+      });
     };
 
     setup();
@@ -235,6 +238,7 @@ export default function ChatThreadScreen() {
         socketRef.off("user_typing");
         socketRef.off("messages_read");
         socketRef.off("error");
+        socketRef.off("connect_error");
       }
       Object.values(typingTimeouts).forEach(clearTimeout);
       disconnectSocket();
